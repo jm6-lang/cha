@@ -2,6 +2,7 @@ package com.shucha.query.service.impl;
 
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.shucha.query.api.dto.NumberLabelRespDTO;
+import com.shucha.query.cache.NumberLabelCache;
 import com.shucha.query.dal.dataobject.QueryHistoryDO;
 import com.shucha.query.dal.mapper.QueryHistoryMapper;
 import com.shucha.query.service.NumberLabelService;
@@ -21,11 +22,35 @@ public class QueryServiceImpl implements QueryService {
 
     private final NumberLabelService numberLabelService;
     private final QueryHistoryMapper historyMapper;
+    private final NumberLabelCache cache;
 
     @Override
     public NumberLabelRespDTO queryNumber(String number, Long userId) {
-        NumberLabelRespDTO result = numberLabelService.query(number);
+        // 1. 查缓存
+        NumberLabelRespDTO result = cache.get(number);
+        boolean fromCache = false;
+        if (result != null) {
+            log.info("[Query] cache hit for {}", number);
+            fromCache = true;
+        } else {
+            // 2. 缓存未命中，调用数据源（多源自动降级）
+            result = numberLabelService.query(number);
+            // 3. 写缓存
+            cache.put(number, result);
+        }
 
+        // 4. 写历史（异步，失败不影响主流程）
+        if (!fromCache) {
+            writeHistoryAsync(number, result, userId);
+        } else {
+            // 缓存命中也快速记录
+            writeHistoryAsync(number, result, userId);
+        }
+
+        return result;
+    }
+
+    private void writeHistoryAsync(String number, NumberLabelRespDTO result, Long userId) {
         try {
             QueryHistoryDO history = new QueryHistoryDO();
             history.setNumber(result.getNumber());
@@ -38,10 +63,8 @@ public class QueryServiceImpl implements QueryService {
             history.setCreateTime(LocalDateTime.now());
             historyMapper.insert(history);
         } catch (Exception e) {
-            log.warn("write query history failed", e);
+            log.warn("[Query] write history failed", e);
         }
-
-        return result;
     }
 
     @Override

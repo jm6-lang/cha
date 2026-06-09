@@ -12,12 +12,34 @@ spring:
     url: jdbc:mysql://localhost:3306/shucha?useUnicode=true&characterEncoding=utf-8&useSSL=false&serverTimezone=Asia/Shanghai
     username: shucha
     password: shucha_pass_2026
+  data:
+    redis:
+      host: localhost
+      port: 6379
+      database: 0
 mybatis-plus:
   configuration:
     map-underscore-to-camel-case: true
   global-config:
     db-config:
       id-type: AUTO
+# 数查业务配置
+shucha:
+  query:
+    # 数据源列表（按顺序尝试，失败降级到下一个，mock 永远兜底）
+    providers:
+      - taobao
+      - mock
+    # 缓存配置
+    cache:
+      enabled: true
+      ttl-days: 30
+    # 阿里云号码百科（需申请）
+    aliyun:
+      access-key-id: ${ALIYUN_AK_ID:}
+      access-key-secret: ${ALIYUN_AK_SECRET:}
+      auth-code: ${ALIYUN_TNS_AUTH_CODE:}
+      endpoint: dytnsapi.aliyuncs.com
 logging:
   level:
     com.shucha: debug
