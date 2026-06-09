@@ -1,0 +1,65 @@
+# 生产环境配置 - Gateway
+server:
+  port: 9001
+
+spring:
+  application:
+    name: shucha-gateway
+  cloud:
+    nacos:
+      discovery:
+        server-addr: ${NACOS_SERVER:localhost:8848}
+        namespace: ${NACOS_NAMESPACE:}
+      config:
+        server-addr: ${NACOS_SERVER:localhost:8848}
+        namespace: ${NACOS_NAMESPACE:}
+        file-extension: yml
+    gateway:
+      discovery:
+        locator:
+          enabled: true
+          lower-case-service-id: true
+      routes:
+        - id: shucha-query
+          uri: lb://shucha-query
+          predicates:
+            - Path=/api/query/**
+        - id: shucha-auth
+          uri: lb://shucha-auth
+          predicates:
+            - Path=/api/auth/**
+        - id: shucha-user
+          uri: lb://shucha-user
+          predicates:
+            - Path=/api/user/**
+      globalcors:
+        cors-configurations:
+          '[/**]':
+            allowedOrigins:
+              - "https://h5.shucha.com"
+              - "https://www.shucha.com"
+            allowedMethods:
+              - GET
+              - POST
+              - PUT
+              - DELETE
+              - OPTIONS
+            allowedHeaders: "*"
+            allowCredentials: true
+            maxAge: 3600
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics
+  endpoint:
+    health:
+      show-details: when_authorized
+
+logging:
+  level:
+    org.springframework.cloud.gateway: warn
+    com.alibaba.nacos: warn
+  file:
+    name: /app/logs/gateway.log

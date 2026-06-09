@@ -1,0 +1,32 @@
+# 生产环境配置 - User Service
+server:
+  port: 9004
+
+spring:
+  application:
+    name: shucha-user
+  cloud:
+    nacos:
+      discovery:
+        server-addr: ${NACOS_SERVER:localhost:8848}
+        namespace: ${NACOS_NAMESPACE:}
+  datasource:
+    driver-class-name: com.mysql.cj.jdbc.Driver
+    url: jdbc:mysql://${MYSQL_HOST:localhost}:${MYSQL_PORT:3306}/shucha?useUnicode=true&characterEncoding=utf-8&useSSL=true&serverTimezone=Asia/Shanghai
+    username: ${MYSQL_USER:shucha}
+    password: ${MYSQL_PASSWORD:shucha_pass_2026}
+    hikari:
+      minimum-idle: 2
+      maximum-pool-size: 10
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info
+
+logging:
+  level:
+    com.shucha: info
+  file:
+    name: /app/logs/user.log

@@ -1,0 +1,72 @@
+name: Deploy to Production
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version to deploy (e.g. 0.1.0)'
+        required: true
+        default: 'latest'
+      environment:
+        description: 'Target environment'
+        type: choice
+        options:
+          - staging
+          - production
+        default: staging
+
+jobs:
+  deploy:
+    name: Deploy to ${{ github.event.inputs.environment }}
+    runs-on: ubuntu-latest
+    environment: ${{ github.event.inputs.environment }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup SSH
+        uses: webfactory/ssh-agent@v0.9.0
+        with:
+          ssh-private-key: ${{ secrets.SSH_PRIVATE_KEY }}
+
+      - name: Deploy to Server
+        env:
+          HOST: ${{ secrets.DEPLOY_HOST }}
+          USER: ${{ secrets.DEPLOY_USER }}
+          VERSION: ${{ github.event.inputs.version }}
+        run: |
+          ssh -o StrictHostKeyChecking=no $USER@$HOST << EOF
+            set -e
+            cd /opt/shucha
+            
+            # 拉取最新代码
+            git pull origin main
+            
+            # 更新镜像版本
+            export IMAGE_VERSION=$VERSION
+            
+            # 拉取最新镜像
+            docker compose -f docker-compose.prod.yml pull
+            
+            # 滚动更新（零停机）
+            docker compose -f docker-compose.prod.yml up -d --no-deps --scale gateway=2 gateway
+            sleep 10
+            docker compose -f docker-compose.prod.yml up -d --no-deps --scale query=2 query
+            sleep 10
+            docker compose -f docker-compose.prod.yml up -d --no-deps --scale auth=2 auth
+            sleep 10
+            docker compose -f docker-compose.prod.yml up -d --no-deps --scale user=2 user
+            
+            # 清理旧容器和镜像
+            docker system prune -f
+            
+            echo "Deployment completed: $VERSION"
+          EOF
+
+      - name: Health Check
+        env:
+          HOST: ${{ secrets.DEPLOY_HOST }}
+        run: |
+          sleep 30
+          curl -f https://$HOST/api/query/number-label?number=13800138000 || exit 1
+          echo "Health check passed"

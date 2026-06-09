@@ -1,0 +1,30 @@
+# 生产环境配置 - Auth Service
+server:
+  port: 9003
+
+spring:
+  application:
+    name: shucha-auth
+  cloud:
+    nacos:
+      discovery:
+        server-addr: ${NACOS_SERVER:localhost:8848}
+        namespace: ${NACOS_NAMESPACE:}
+  data:
+    redis:
+      host: ${REDIS_HOST:localhost}
+      port: ${REDIS_PORT:6379}
+      password: ${REDIS_PASSWORD:}
+      database: 1
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info
+
+logging:
+  level:
+    com.shucha: info
+  file:
+    name: /app/logs/auth.log

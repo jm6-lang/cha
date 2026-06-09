@@ -1,0 +1,120 @@
+# 数查 (ShuCha) 生产环境 Docker Compose
+# 用法：docker compose -f docker-compose.prod.yml up -d
+#
+# 前置条件：
+# 1. 已配置好 MySQL / Redis / Nacos（阿里云 RDS / Redis / 自建 Nacos）
+# 2. 已修改各服务的 application-prod.yml 指向生产数据库
+# 3. 已构建镜像：docker compose -f docker-compose.prod.yml build
+
+version: '3.8'
+
+services:
+  # ===== 网关 =====
+  gateway:
+    build:
+      context: ./backend
+      dockerfile: shucha-gateway/Dockerfile
+    image: shucha/gateway:0.1.0
+    container_name: shucha-gateway
+    restart: unless-stopped
+    ports:
+      - "9001:9001"
+    environment:
+      - SPRING_PROFILES_ACTIVE=prod
+      - JAVA_OPTS=-Xms256m -Xmx512m
+    networks:
+      - shucha-net
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9001/actuator/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+
+  # ===== 查询服务 =====
+  query:
+    build:
+      context: ./backend
+      dockerfile: shucha-query/Dockerfile
+    image: shucha/query:0.1.0
+    container_name: shucha-query
+    restart: unless-stopped
+    ports:
+      - "9002:9002"
+    environment:
+      - SPRING_PROFILES_ACTIVE=prod
+      - JAVA_OPTS=-Xms256m -Xmx512m
+    networks:
+      - shucha-net
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9002/actuator/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+
+  # ===== 认证服务 =====
+  auth:
+    build:
+      context: ./backend
+      dockerfile: shucha-auth/Dockerfile
+    image: shucha/auth:0.1.0
+    container_name: shucha-auth
+    restart: unless-stopped
+    ports:
+      - "9003:9003"
+    environment:
+      - SPRING_PROFILES_ACTIVE=prod
+      - JAVA_OPTS=-Xms128m -Xmx256m
+    networks:
+      - shucha-net
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9003/actuator/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+
+  # ===== 用户服务 =====
+  user:
+    build:
+      context: ./backend
+      dockerfile: shucha-user/Dockerfile
+    image: shucha/user:0.1.0
+    container_name: shucha-user
+    restart: unless-stopped
+    ports:
+      - "9004:9004"
+    environment:
+      - SPRING_PROFILES_ACTIVE=prod
+      - JAVA_OPTS=-Xms128m -Xmx256m
+    networks:
+      - shucha-net
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9004/actuator/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+
+  # ===== Nginx（反向代理 + 静态资源）=====
+  nginx:
+    image: nginx:alpine
+    container_name: shucha-nginx
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./docker/nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./docker/nginx/conf.d:/etc/nginx/conf.d:ro
+      - ./docker/nginx/ssl:/etc/nginx/ssl:ro
+      - ./frontend/dist/build/h5:/var/www/shucha-h5:ro
+    depends_on:
+      - gateway
+    networks:
+      - shucha-net
+
+networks:
+  shucha-net:
+    driver: bridge
