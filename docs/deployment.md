@@ -331,8 +331,8 @@ scp -r dist/build/h5/* root@<ecs-ip>:/var/www/shucha-h5/
 - [ ] 公安网安备案（30 日内）
 - [ ] HTTPS 证书配置
 - [ ] 网站底部 ICP 备案号 + 公安备案号
-- [ ] 《用户协议》页面
-- [ ] 《隐私政策》页面
+- [x] 《用户协议》（[terms-of-service.md](terms-of-service.md)）
+- [x] 《隐私政策》（[privacy-policy.md](privacy-policy.md)）
 - [ ] 个人信息保护合规评估
 - [ ] 支付接口审核通过
 
