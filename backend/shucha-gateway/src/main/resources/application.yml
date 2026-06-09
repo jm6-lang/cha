@@ -1,0 +1,30 @@
+server:
+  port: 9001
+spring:
+  application:
+    name: shucha-gateway
+  cloud:
+    nacos:
+      discovery:
+        server-addr: localhost:8848
+    gateway:
+      discovery:
+        locator:
+          enabled: true
+          lower-case-service-id: true
+      routes:
+        - id: shucha-query
+          uri: lb://shucha-query
+          predicates:
+            - Path=/api/query/**
+        - id: shucha-auth
+          uri: lb://shucha-auth
+          predicates:
+            - Path=/api/auth/**
+        - id: shucha-user
+          uri: lb://shucha-user
+          predicates:
+            - Path=/api/user/**
+logging:
+  level:
+    org.springframework.cloud.gateway: info

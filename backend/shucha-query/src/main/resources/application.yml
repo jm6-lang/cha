@@ -1,0 +1,23 @@
+server:
+  port: 9002
+spring:
+  application:
+    name: shucha-query
+  cloud:
+    nacos:
+      discovery:
+        server-addr: localhost:8848
+  datasource:
+    driver-class-name: com.mysql.cj.jdbc.Driver
+    url: jdbc:mysql://localhost:3306/shucha?useUnicode=true&characterEncoding=utf-8&useSSL=false&serverTimezone=Asia/Shanghai
+    username: shucha
+    password: shucha_pass_2026
+mybatis-plus:
+  configuration:
+    map-underscore-to-camel-case: true
+  global-config:
+    db-config:
+      id-type: AUTO
+logging:
+  level:
+    com.shucha: debug

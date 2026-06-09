@@ -1,0 +1,19 @@
+{
+  "name": "数查",
+  "appid": "__UNI__SHUCHA01",
+  "description": "号码标记查询与数据服务",
+  "versionName": "0.1.0",
+  "versionCode": "1",
+  "transformPx": false,
+  "app-plus": {
+    "usingComponents": true
+  },
+  "h5": {
+    "router": {
+      "mode": "history",
+      "base": "/"
+    },
+    "title": "数查 - 号码查询服务"
+  },
+  "vueVersion": "3"
+}

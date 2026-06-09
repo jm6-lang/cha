@@ -1,0 +1,44 @@
+version: '3.8'
+services:
+  mysql:
+    image: mysql:8.0
+    container_name: shucha-mysql
+    restart: unless-stopped
+    environment:
+      MYSQL_ROOT_PASSWORD: shucha_root_2026
+      MYSQL_DATABASE: shucha
+      MYSQL_USER: shucha
+      MYSQL_PASSWORD: shucha_pass_2026
+    ports:
+      - "3306:3306"
+    volumes:
+      - ./docker/mysql/init:/docker-entrypoint-initdb.d
+      - mysql_data:/var/lib/mysql
+    command: --character-set-server=utf8mb4 --collation-server=utf8mb4_unicode_ci
+
+  redis:
+    image: redis:7-alpine
+    container_name: shucha-redis
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+
+  nacos:
+    image: nacos/nacos-server:v2.4.0
+    container_name: shucha-nacos
+    restart: unless-stopped
+    environment:
+      MODE: standalone
+      JVM_XMS: 512m
+      JVM_XMX: 512m
+    ports:
+      - "8848:8848"
+      - "9848:9848"
+    volumes:
+      - ./docker/nacos/standalone-logs/:/home/nacos/logs
+
+volumes:
+  mysql_data:
+  redis_data:

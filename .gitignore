@@ -1,0 +1,30 @@
+# Java / Maven
+target/
+*.class
+*.jar
+*.war
+.mvn/
+HELP.md
+
+# Node
+node_modules/
+dist/
+.hbuilderx/
+unpackage/
+
+# IDE
+.idea/
+.vscode/
+*.iml
+.DS_Store
+
+# Logs
+*.log
+logs/
+
+# Env
+.env
+.env.local
+
+# OS
+Thumbs.db

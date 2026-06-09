@@ -1,0 +1,14 @@
+{
+  "pages": [
+    { "path": "pages/index/index", "style": { "navigationBarTitleText": "数查" } },
+    { "path": "pages/hcc/result", "style": { "navigationBarTitleText": "查询结果" } },
+    { "path": "pages/hcc/history", "style": { "navigationBarTitleText": "查询历史" } },
+    { "path": "pages/user/profile", "style": { "navigationBarTitleText": "我的" } }
+  ],
+  "globalStyle": {
+    "navigationBarTextStyle": "white",
+    "navigationBarTitleText": "数查",
+    "navigationBarBackgroundColor": "#1A6CFF",
+    "backgroundColor": "#F5F7FA"
+  }
+}
