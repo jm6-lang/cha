@@ -230,21 +230,21 @@ function onSearch() {
     uni.navigateTo({ url: `/pages/hcc/result?number=${encodeURIComponent(val)}` });
   } else {
     // 查关系 - 公司名称
-    uni.showToast({ title: '查关系 - 即将上线', icon: 'none' });
+    uni.navigateTo({ url: `/pages/hcc/company-result?companyName=${encodeURIComponent(val)}` });
   }
 }
 
 function onCategoryTap(cat: any) {
-  uni.showToast({ title: `${cat.name} - 即将上线`, icon: 'none' });
+  uni.navigateTo({ url: `/pages/hcc/func-category?typeCode=${cat.typeCode}` });
 }
 
 function onServiceTap(svc: any) {
-  if (svc.typeCode === 'carrier' && svc.name === '号码标记查询') {
+  if (svc.typeCode === 'carrier' && (svc.name === '号码标记查询' || svc.name === '号码归属地')) {
     // 聚焦搜索框
     activeTab.value = 0;
     return;
   }
-  uni.showToast({ title: `${svc.name} - 即将上线`, icon: 'none' });
+  uni.navigateTo({ url: `/pages/hcc/func-query?typeCode=${svc.typeCode}&name=${encodeURIComponent(svc.name)}` });
 }
 
 function goHistory() {

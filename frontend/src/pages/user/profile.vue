@@ -102,17 +102,17 @@ const user = useUserStore();
 
 const menuGroup1 = [
   { name: '我的查询', icon: '📋', bgColor: '#E3F2FD', badge: '', action: 'history' },
-  { name: '我的订单', icon: '📦', bgColor: '#FFF3E0', badge: '', action: '' },
-  { name: '我的钱包', icon: '💰', bgColor: '#E8F5E9', badge: '', action: '' },
-  { name: '我的优惠券', icon: '🎫', bgColor: '#FCE4EC', badge: '2', action: '' },
+  { name: '我的订单', icon: '📦', bgColor: '#FFF3E0', badge: '', action: 'order' },
+  { name: '我的钱包', icon: '💰', bgColor: '#E8F5E9', badge: '', action: 'wallet' },
+  { name: '我的优惠券', icon: '🎫', bgColor: '#FCE4EC', badge: '2', action: 'coupon' },
 ];
 
 const menuGroup2 = [
-  { name: '邀请好友', icon: '🎁', bgColor: '#F3E5F5', badge: '赚佣金', action: '' },
-  { name: '代理中心', icon: '🤝', bgColor: '#E0F7FA', badge: '', action: '' },
-  { name: '意见反馈', icon: '💬', bgColor: '#E8EAF6', badge: '', action: '' },
-  { name: '设置', icon: '⚙️', bgColor: '#F2F3F5', badge: '', action: '' },
-  { name: '关于数查', icon: 'ℹ️', bgColor: '#F1F8E9', badge: '', action: '' },
+  { name: '邀请好友', icon: '🎁', bgColor: '#F3E5F5', badge: '赚佣金', action: 'invite' },
+  { name: '代理中心', icon: '🤝', bgColor: '#E0F7FA', badge: '', action: 'agent' },
+  { name: '意见反馈', icon: '💬', bgColor: '#E8EAF6', badge: '', action: 'feedback' },
+  { name: '设置', icon: '⚙️', bgColor: '#F2F3F5', badge: '', action: 'settings' },
+  { name: '关于数查', icon: 'ℹ️', bgColor: '#F1F8E9', badge: '', action: 'about' },
 ];
 
 function goProfile() {
@@ -124,16 +124,28 @@ function goHistory() {
 }
 
 function onRecharge() {
-  uni.showToast({ title: '充值 - 即将上线', icon: 'none' });
+  uni.navigateTo({ url: '/pages/user/recharge' });
 }
 
 function onVip() {
-  uni.showToast({ title: '会员中心 - 即将上线', icon: 'none' });
+  uni.navigateTo({ url: '/pages/user/vip' });
 }
 
 function onMenu(m: any) {
-  if (m.action === 'history') {
-    uni.navigateTo({ url: '/pages/hcc/history' });
+  const routeMap: Record<string, string> = {
+    history: '/pages/hcc/history',
+    order: '/pages/order/list',
+    wallet: '/pages/user/wallet',
+    coupon: '/pages/user/coupon',
+    invite: '/pages/user/invite',
+    agent: '/pages/user/agent',
+    feedback: '/pages/user/feedback',
+    settings: '/pages/user/settings',
+    about: '/pages/user/about',
+  };
+  const url = routeMap[m.action];
+  if (url) {
+    uni.navigateTo({ url });
   } else {
     uni.showToast({ title: `${m.name} - 即将上线`, icon: 'none' });
   }
