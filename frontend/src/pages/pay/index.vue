@@ -83,6 +83,7 @@
 import { ref } from 'vue';
 import { onLoad } from '@dcloudio/uni-app';
 import { useUserStore } from '@/stores/user';
+import { payFor } from '@/api/pay';
 
 const user = useUserStore();
 
@@ -90,32 +91,73 @@ const serviceName = ref('');
 const servicePrice = ref('');
 const typeCode = ref('');
 const payMethod = ref('wechat');
+const openid = ref('');
+const paying = ref(false);
 
 onLoad((options: any) => {
   if (options) {
-    serviceName.value = decodeURIComponent(options.name || '');
-    servicePrice.value = options.price || '';
-    typeCode.value = options.typeCode || '';
+    serviceName.value = decodeURIComponent(options.subject || options.name || '');
+    servicePrice.value = options.amount || options.price || '';
+    typeCode.value = options.type || options.typeCode || '';
   }
+  // 拉取 openid（H5 直接忽略；小程序通过 wx.login 走后端换）
+  // #ifdef MP-WEIXIN
+  uni.login({
+    success: (res) => {
+      if (res.code) {
+        // 调后端换 openid（这里简化：直接用 code 代替；生产应走后端兑换 openid）
+        // 后端：POST /api/wx/jscode2session?code=xxx
+        uni.request({
+          url: '/api/wx/jscode2session',
+          method: 'POST',
+          data: { code: res.code },
+          success: (r) => {
+            if ((r.data as any)?.code === 0) openid.value = (r.data as any).openid;
+          },
+        });
+      }
+    },
+  });
+  // #endif
 });
 
 function onCoupon() {
   uni.showToast({ title: '暂无可用优惠券', icon: 'none' });
 }
 
-function onPay() {
+async function onPay() {
+  if (paying.value) return;
   if (!user.isLoggedIn) {
     uni.navigateTo({ url: '/pages/index/login' });
     return;
   }
-  // 模拟支付成功
-  uni.showLoading({ title: '支付中...' });
-  setTimeout(() => {
-    uni.hideLoading();
-    uni.redirectTo({
-      url: `/pages/pay/result?status=success&name=${encodeURIComponent(serviceName.value)}&price=${servicePrice.value}`,
+  paying.value = true;
+  try {
+    const priceNum = parseFloat(servicePrice.value) || 0;
+    if (priceNum < 0.01) {
+      uni.showToast({ title: '金额错误', icon: 'none' });
+      return;
+    }
+    // #ifdef MP-WEIXIN
+    if (!openid.value) {
+      uni.showToast({ title: '正在获取 openid...', icon: 'none' });
+      return;
+    }
+    // #endif
+    const r = await payFor({
+      totalFen: Math.round(priceNum * 100),
+      subject: serviceName.value,
+      attach: typeCode.value,
+      openid: openid.value,
     });
-  }, 1000);
+    if (!r) return;
+    // 跳到结果页（带订单号，轮询查单）
+    uni.redirectTo({
+      url: `/pages/pay/result?outTradeNo=${r.out_trade_no}&subject=${encodeURIComponent(serviceName.value)}&amount=${servicePrice.value}`,
+    });
+  } finally {
+    paying.value = false;
+  }
 }
 </script>
 

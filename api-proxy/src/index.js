@@ -7,6 +7,11 @@
  *   GET  /api/tmini/:endpoint?params...     → 代理 tmini.net
  *   POST /api/marriage/single               → 个人婚姻核验
  *   POST /api/marriage/dual                 → 双人婚姻核验
+ *   POST /api/pay/jsapi                     → 小程序支付下单
+ *   POST /api/pay/h5                        → H5 浏览器支付下单
+ *   GET  /api/pay/query/:out_trade_no       → 查单
+ *   POST /api/pay/refund                    → 退款
+ *   POST /api/pay/notify                    → 微信支付回调（验签）
  *   GET  /api/health                        → 健康检查
  *
  * 部署：
@@ -14,8 +19,21 @@
  *   wrangler secret put MARRIAGE_APIKEY
  *   wrangler secret put MARRIAGE_PROVIDER     # aliyun / hunyin / yushan / tianyuan
  *   wrangler secret put MARRIAGE_GATEWAY      # 可选，覆盖默认网关
+ *
+ *   # 微信支付（拿到商户号后注入）
+ *   wrangler secret put WECHAT_MCH_ID
+ *   wrangler secret put WECHAT_APPID
+ *   wrangler secret put WECHAT_API_V3_KEY
+ *   wrangler secret put WECHAT_MCH_KEY_PEM    # base64 编码
+ *   wrangler secret put SERIAL_NO
  *   wrangler deploy
  */
+
+import {
+  createJsapiOrder, buildJsapiPayParams,
+  createH5Order, queryOrder, refund, verifyNotify,
+  createOutTradeNo,
+} from './pay.js';
 
 export default {
   async fetch(request, env, ctx) {
@@ -45,6 +63,28 @@ export default {
           return json({ code: 405, msg: 'POST required' }, 405, request);
         }
         return await handleMarriage(pathname, request, env);
+      }
+
+      // 支付路由
+      if (pathname === '/api/pay/jsapi' && request.method === 'POST') {
+        return await handleJsapiPay(request, env);
+      }
+      if (pathname === '/api/pay/h5' && request.method === 'POST') {
+        return await handleH5Pay(request, env);
+      }
+      if (pathname.startsWith('/api/pay/query/') && request.method === 'GET') {
+        const outTradeNo = pathname.replace('/api/pay/query/', '');
+        return await handlePayQuery(outTradeNo, env);
+      }
+      if (pathname === '/api/pay/refund' && request.method === 'POST') {
+        return await handleRefund(request, env);
+      }
+      if (pathname === '/api/pay/notify' && request.method === 'POST') {
+        return await handleNotify(request, env);
+      }
+
+      if (pathname === '/api/wx/jscode2session' && request.method === 'POST') {
+        return await handleWxCode2Session(request, env);
       }
 
       return json({ code: 404, msg: 'Not Found', path: pathname }, 404, request);
@@ -181,4 +221,82 @@ async function proxyFetch(target, request) {
   let data;
   try { data = JSON.parse(text); } catch { data = { raw: text }; }
   return json(data, resp.status, request);
+}
+
+// ============= 微信支付路由 =============
+function requirePayConfig(env) {
+  if (!env.WECHAT_MCH_ID || !env.WECHAT_APPID || !env.WECHAT_API_V3_KEY || !env.WECHAT_MCH_KEY_PEM) {
+    throw new Error('未配置微信支付参数（wrangler secret put WECHAT_MCH_ID / APPID / API_V3_KEY / MCH_KEY_PEM）');
+  }
+}
+
+async function handleJsapiPay(request, env) {
+  requirePayConfig(env);
+  const body = await request.json().catch(() => null);
+  if (!body) return json({ code: 400, msg: 'JSON body required' }, 400, request);
+  const { openid, totalFen, subject, outTradeNo, attach } = body;
+  if (!openid || !totalFen || !subject) {
+    return json({ code: 400, msg: 'openid/totalFen/subject 必填' }, 400, request);
+  }
+  const order = await createJsapiOrder(env, openid, outTradeNo || createOutTradeNo('JS'), totalFen, subject, attach);
+  const payParams = await buildJsapiPayParams(env, order.prepay_id);
+  return json({ code: 0, prepay_id: order.prepay_id, payParams, out_trade_no: outTradeNo || createOutTradeNo('JS') }, 200, request);
+}
+
+async function handleH5Pay(request, env) {
+  requirePayConfig(env);
+  const body = await request.json().catch(() => null);
+  if (!body) return json({ code: 400, msg: 'JSON body required' }, 400, request);
+  const { totalFen, subject, outTradeNo, clientIp, attach } = body;
+  if (!totalFen || !subject) return json({ code: 400, msg: 'totalFen/subject 必填' }, 400, request);
+  const ip = clientIp || request.headers.get('CF-Connecting-IP') || '127.0.0.1';
+  const order = await createH5Order(env, outTradeNo || createOutTradeNo('H5'), totalFen, subject, ip, attach);
+  return json({ code: 0, h5_url: order.h5_url, out_trade_no: outTradeNo || createOutTradeNo('H5') }, 200, request);
+}
+
+async function handlePayQuery(outTradeNo, env) {
+  requirePayConfig(env);
+  const r = await queryOrder(env, outTradeNo);
+  return json({ code: 0, ...r }, 200, request);
+}
+
+async function handleRefund(request, env) {
+  requirePayConfig(env);
+  const body = await request.json().catch(() => null);
+  if (!body) return json({ code: 400, msg: 'JSON body required' }, 400, request);
+  const { outTradeNo, refundNo, totalFen, refundFen, reason } = body;
+  const r = await refund(env, outTradeNo, refundNo || createOutTradeNo('RF'), totalFen, refundFen, reason);
+  return json({ code: 0, ...r }, 200, request);
+}
+
+async function handleNotify(request, env) {
+  // 验签（生产环境需从微信下载平台证书，此处为简化）
+  const ok = await verifyNotify(env, request.headers.get('Wechatpay-Signature'), null);
+  if (!ok) return new Response('FAIL', { status: 401 });
+  // 解析回调内容（业务逻辑：更新订单状态、发货、查询服务等）
+  const body = await request.json();
+  console.log('支付回调：', body);
+  // 业务处理成功后必须返回 200 + 特定 JSON
+  return new Response(JSON.stringify({ code: 'SUCCESS', message: '成功' }), {
+    status: 200,
+    headers: { 'Content-Type': 'application/json' },
+  });
+}
+
+// ============= 微信 code 换 openid =============
+async function handleWxCode2Session(request, env) {
+  const body = await request.json().catch(() => null);
+  if (!body?.code) return json({ code: 400, msg: 'code required' }, 400, request);
+  const appid = env.WECHAT_APPID;
+  const secret = env.WECHAT_APP_SECRET;
+  if (!appid || !secret) {
+    return json({ code: 503, msg: '后端未配置 WECHAT_APPID / WECHAT_APP_SECRET' }, 503, request);
+  }
+  const url = `https://api.weixin.qq.com/sns/jscode2session?appid=${appid}&secret=${secret}&js_code=${body.code}&grant_type=authorization_code`;
+  const resp = await fetch(url);
+  const data: any = await resp.json();
+  if (data.openid) {
+    return json({ code: 0, openid: data.openid, unionid: data.unionid, session_key: data.session_key }, 200, request);
+  }
+  return json({ code: data.errcode || 500, msg: data.errmsg || 'session 失败' }, 500, request);
 }

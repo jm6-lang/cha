@@ -284,7 +284,8 @@ const onReport = () => {
 };
 
 const onClear = () => {
-  uni.navigateTo({ url: '/pages/hcc/result?type=phone_clear&price=clear' });
+  // 跳到支付确认页（统一流程：选择套餐 → 微信支付 → 查结果）
+  uni.navigateTo({ url: '/pages/pay/index?type=phone_clear&subject=' + encodeURIComponent('号码标记清除') + '&amount=18.00' });
 };
 
 // 加载历史记录

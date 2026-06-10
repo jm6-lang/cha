@@ -1,197 +1,144 @@
 <template>
   <view class="page">
-    <view class="result-container">
-      <!-- 成功状态 -->
-      <template v-if="isSuccess">
-        <view class="result-icon-wrap success">
-          <text class="result-icon">&#10003;</text>
-        </view>
-        <text class="result-title">支付成功</text>
-        <text class="result-price">¥{{ price }}</text>
-        <text class="result-name">{{ name }}</text>
+    <view class="header">
+      <view :style="{ height: statusBarHeight + 'px' }" />
+      <view class="header-content">
+        <view class="header-icon">{{ icon }}</view>
+        <text class="header-title">{{ title }}</text>
+        <text class="header-desc">{{ subtitle }}</text>
+      </view>
+    </view>
 
-        <view class="result-actions">
-          <view class="btn-primary" @tap="goOrder">
-            <text class="btn-text">查看订单</text>
-          </view>
-          <view class="btn-secondary" @tap="goHome">
-            <text class="btn-text-secondary">返回首页</text>
-          </view>
-        </view>
-      </template>
+    <view class="result-card">
+      <view class="amount">
+        <text class="amount-num">¥{{ amount }}</text>
+        <text class="amount-label">订单金额</text>
+      </view>
+      <view class="info-row">
+        <text class="info-label">订单号</text>
+        <text class="info-value">{{ outTradeNo }}</text>
+      </view>
+      <view class="info-row">
+        <text class="info-label">商品</text>
+        <text class="info-value">{{ subject }}</text>
+      </view>
+      <view class="info-row" v-if="paidAt">
+        <text class="info-label">支付时间</text>
+        <text class="info-value">{{ paidAt }}</text>
+      </view>
+      <view class="info-row" v-if="tradeNo">
+        <text class="info-label">微信订单号</text>
+        <text class="info-value">{{ tradeNo }}</text>
+      </view>
+    </view>
 
-      <!-- 失败状态 -->
-      <template v-else>
-        <view class="result-icon-wrap fail">
-          <text class="result-icon">&#10005;</text>
-        </view>
-        <text class="result-title">支付失败</text>
-        <text class="result-fail-desc">请检查网络或余额后重试</text>
-
-        <view class="result-actions">
-          <view class="btn-primary" @tap="onRetry">
-            <text class="btn-text">重新支付</text>
-          </view>
-          <view class="btn-secondary" @tap="goHome">
-            <text class="btn-text-secondary">返回首页</text>
-          </view>
-        </view>
-      </template>
+    <view class="action-row">
+      <view class="btn-secondary" @tap="onBack">返回</view>
+      <view class="btn-primary" v-if="status === 'PENDING'" @tap="onCheckAgain">🔄 重新查询</view>
+      <view class="btn-primary" v-if="status === 'FAIL'" @tap="onRetry">重新支付</view>
     </view>
   </view>
 </template>
 
 <script setup lang="ts">
-import { ref, computed } from 'vue';
-import { onLoad } from '@dcloudio/uni-app';
-import { useUserStore } from '@/stores/user';
+import { ref, computed, onMounted, onUnmounted } from 'vue';
+import { queryOrder } from '@/api/pay';
 
-const user = useUserStore();
+const statusBarHeight = ref(uni.getSystemInfoSync().statusBarHeight || 44);
 
-const status = ref('success');
-const name = ref('');
-const price = ref('');
+// 页面参数
+const outTradeNo = ref<string>('');
+const subject = ref<string>('');
+const amount = ref<string>('0.00');
+const status = ref<'PENDING' | 'SUCCESS' | 'FAIL'>('PENDING');
+const paidAt = ref<string>('');
+const tradeNo = ref<string>('');
 
-const isSuccess = computed(() => status.value === 'success');
+const icon = computed(() => status.value === 'SUCCESS' ? '✅' : status.value === 'FAIL' ? '❌' : '⏳');
+const title = computed(() => status.value === 'SUCCESS' ? '支付成功' : status.value === 'FAIL' ? '支付失败' : '等待支付');
+const subtitle = computed(() => status.value === 'PENDING' ? '正在查询订单状态...' : status.value === 'SUCCESS' ? '感谢您的支持' : '请重新尝试');
 
-onLoad((options: any) => {
-  if (options) {
-    status.value = options.status || 'success';
-    name.value = decodeURIComponent(options.name || '');
-    price.value = options.price || '';
+let pollTimer: any = null;
+
+onMounted(() => {
+  const pages = getCurrentPages();
+  const page: any = pages[pages.length - 1];
+  const opt = page?.options || {};
+  outTradeNo.value = opt.outTradeNo || '';
+  subject.value = decodeURIComponent(opt.subject || '');
+  amount.value = opt.amount || '0.00';
+
+  if (outTradeNo.value) {
+    // 启动轮询（每 3 秒查一次，最多 10 次）
+    let times = 0;
+    pollTimer = setInterval(async () => {
+      times++;
+      if (times > 10) {
+        clearInterval(pollTimer);
+        pollTimer = null;
+        return;
+      }
+      const r = await queryOrder(outTradeNo.value);
+      if (!r) return;
+      if (r.trade_state === 'SUCCESS' || r.status === 'SUCCESS') {
+        status.value = 'SUCCESS';
+        paidAt.value = new Date(r.success_time || r.paidAt || Date.now()).toLocaleString('zh-CN');
+        tradeNo.value = r.transaction_id || r.tradeNo || '';
+        clearInterval(pollTimer);
+        pollTimer = null;
+      } else if (r.trade_state === 'CLOSED' || r.trade_state === 'REVOKED' || r.status === 'FAIL') {
+        status.value = 'FAIL';
+        clearInterval(pollTimer);
+        pollTimer = null;
+      }
+    }, 3000);
   }
 });
 
-function goOrder() {
-  uni.navigateTo({ url: '/pages/order/list' });
-}
+onUnmounted(() => {
+  if (pollTimer) clearInterval(pollTimer);
+});
 
-function goHome() {
-  uni.switchTab({ url: '/pages/index/index' });
-}
+const onCheckAgain = async () => {
+  if (!outTradeNo.value) return;
+  const r = await queryOrder(outTradeNo.value);
+  if (r && (r.trade_state === 'SUCCESS' || r.status === 'SUCCESS')) {
+    status.value = 'SUCCESS';
+    paidAt.value = new Date(r.success_time || r.paidAt || Date.now()).toLocaleString('zh-CN');
+    tradeNo.value = r.transaction_id || '';
+  } else if (r && (r.trade_state === 'CLOSED' || r.status === 'FAIL')) {
+    status.value = 'FAIL';
+  } else {
+    uni.showToast({ title: '订单未支付', icon: 'none' });
+  }
+};
 
-function onRetry() {
-  uni.navigateBack();
-}
+const onRetry = () => {
+  uni.navigateBack({ delta: 1 });
+};
+
+const onBack = () => {
+  uni.navigateBack({ delta: 1 });
+};
 </script>
 
 <style lang="scss" scoped>
-@import '@/styles/variables.scss';
-
-.page {
-  background: $bg-page;
-  min-height: 100vh;
-}
-
-.result-container {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  padding-top: 120rpx;
-}
-
-/* ===== 结果图标 ===== */
-.result-icon-wrap {
-  width: 160rpx;
-  height: 160rpx;
-  border-radius: 50%;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  margin-bottom: 32rpx;
-}
-
-.result-icon-wrap.success {
-  background: $primary-light;
-}
-
-.result-icon-wrap.fail {
-  background: #FFECEC;
-}
-
-.result-icon {
-  font-size: 72rpx;
-  font-weight: 700;
-}
-
-.success .result-icon {
-  color: $primary;
-}
-
-.fail .result-icon {
-  color: $danger;
-}
-
-/* ===== 结果信息 ===== */
-.result-title {
-  font-size: 40rpx;
-  font-weight: 700;
-  color: $text-primary;
-  margin-bottom: 16rpx;
-}
-
-.result-price {
-  font-size: 56rpx;
-  font-weight: 700;
-  color: $danger;
-  margin-bottom: 12rpx;
-}
-
-.result-name {
-  font-size: 28rpx;
-  color: $text-secondary;
-  margin-bottom: 8rpx;
-}
-
-.result-fail-desc {
-  font-size: 28rpx;
-  color: $text-tertiary;
-  margin-bottom: 8rpx;
-}
-
-/* ===== 操作按钮 ===== */
-.result-actions {
-  margin-top: 64rpx;
-  width: 100%;
-  padding: 0 64rpx;
-  display: flex;
-  flex-direction: column;
-  gap: 24rpx;
-}
-
-.btn-primary {
-  height: 96rpx;
-  background: $primary;
-  border-radius: 999rpx;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  box-shadow: 0 8rpx 24rpx rgba(7, 193, 96, 0.3);
-}
-
-.btn-primary:active {
-  opacity: 0.85;
-}
-
-.btn-text {
-  font-size: 32rpx;
-  color: #fff;
-  font-weight: 600;
-}
-
-.btn-secondary {
-  height: 96rpx;
-  background: $bg-card;
-  border-radius: 999rpx;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  border: 1rpx solid $border;
-}
-
-.btn-text-secondary {
-  font-size: 30rpx;
-  color: $text-secondary;
-  font-weight: 500;
-}
+@import '@/static/styles/variables.scss';
+.page { min-height: 100vh; background: $bg-page; padding-bottom: 40rpx; }
+.header { background: linear-gradient(135deg, #07C160, #00B85A); padding: 30rpx 40rpx 60rpx; }
+.header-content { display: flex; flex-direction: column; align-items: center; }
+.header-icon { font-size: 100rpx; margin-bottom: 16rpx; }
+.header-title { font-size: 40rpx; font-weight: 700; color: #fff; }
+.header-desc { font-size: 24rpx; color: rgba(255,255,255,0.85); margin-top: 8rpx; }
+.result-card { background: #fff; margin: -40rpx 24rpx 0; border-radius: 20rpx; padding: 40rpx 30rpx; box-shadow: 0 4rpx 16rpx rgba(0,0,0,0.05); }
+.amount { text-align: center; padding: 30rpx 0 40rpx; border-bottom: 1rpx solid $border-color; margin-bottom: 20rpx; }
+.amount-num { font-size: 60rpx; color: $danger; font-weight: 700; display: block; }
+.amount-label { font-size: 24rpx; color: $text-tertiary; display: block; margin-top: 8rpx; }
+.info-row { display: flex; padding: 18rpx 0; }
+.info-label { width: 180rpx; font-size: 26rpx; color: $text-tertiary; flex-shrink: 0; }
+.info-value { font-size: 26rpx; color: $text-primary; flex: 1; word-break: break-all; }
+.action-row { display: flex; gap: 20rpx; padding: 30rpx 24rpx; }
+.btn-secondary, .btn-primary { flex: 1; text-align: center; padding: 24rpx 0; border-radius: 40rpx; font-size: 28rpx; font-weight: 600; }
+.btn-secondary { background: #fff; color: $text-secondary; border: 2rpx solid $border-color; }
+.btn-primary { background: linear-gradient(135deg, #07C160, #00B85A); color: #fff; }
 </style>
