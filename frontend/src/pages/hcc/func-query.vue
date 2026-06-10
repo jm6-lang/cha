@@ -207,6 +207,34 @@
           />
         </view>
       </template>
+
+      <!-- 银行卡核验字段（银行卡三要素/银行卡四要素） -->
+      <template v-if="name === '银行卡三要素' || name === '银行卡四要素'">
+        <view class="form-group">
+          <text class="form-label">银行卡号</text>
+          <input
+            v-model="form.bankCard"
+            class="form-input"
+            type="number"
+            maxlength="19"
+            placeholder="请输入银行卡号"
+            placeholder-class="form-placeholder"
+          />
+        </view>
+      </template>
+
+      <!-- IP 归属地查询 -->
+      <template v-if="name === 'IP归属地查询'">
+        <view class="form-group">
+          <text class="form-label">IP地址</text>
+          <input
+            v-model="form.ip"
+            class="form-input"
+            placeholder="请输入IP地址（如：8.8.8.8）"
+            placeholder-class="form-placeholder"
+          />
+        </view>
+      </template>
     </view>
 
     <!-- 底部操作区 -->
@@ -230,6 +258,15 @@
 <script setup lang="ts">
 import { ref, reactive, computed } from 'vue';
 import { onLoad } from '@dcloudio/uni-app';
+import {
+  queryPhoneLabels,
+  queryIdCardLocation,
+  queryCompanyInfo,
+  queryCarInfo,
+  queryDishonest,
+  queryBankInfo,
+  queryIpLocation,
+} from '@/api/free-apis';
 
 const typeCode = ref('');
 const name = ref('');
@@ -247,115 +284,117 @@ const form = reactive({
   vin: '',
   companyName: '',
   creditCode: '',
+  bankCard: '',
+  ip: '',
 });
 
 // 服务信息映射
 const serviceInfoMap: Record<string, Record<string, { icon: string; bgColor: string; desc: string; price: string }>> = {
   identity: {
-    '实名核验': { icon: '🪪', bgColor: '#E8F5E9', desc: '验证姓名与身份证号是否匹配', price: '¥5.0' },
-    '人像比对': { icon: '📷', bgColor: '#E8F5E9', desc: '身份证照片与本人人脸比对', price: '¥8.0' },
-    '身份证二要素': { icon: '🪪', bgColor: '#E8F5E9', desc: '身份证姓名与号码一致性核验', price: '¥3.0' },
-    '手机三要素': { icon: '📱', bgColor: '#E3F2FD', desc: '姓名+身份证+手机号一致性核验', price: '¥5.0' },
-    '银行卡三要素': { icon: '💳', bgColor: '#E0F7FA', desc: '姓名+身份证+银行卡一致性核验', price: '¥5.0' },
-    '护照核验': { icon: '📘', bgColor: '#E3F2FD', desc: '护照信息真伪核验', price: '¥8.0' },
-    '驾照核验': { icon: '🚘', bgColor: '#FFF3E0', desc: '驾驶证信息真伪核验', price: '¥5.0' },
-    '学历查询': { icon: '🎓', bgColor: '#F1F8E9', desc: '学历证书真伪查询', price: '¥8.0' },
-    '个人征信': { icon: '👤', bgColor: '#E0F7FA', desc: '个人征信报告查询', price: '¥49.0' },
-    '社交账号检测': { icon: '⭐', bgColor: '#FFF3E0', desc: '社交平台账号真实性检测', price: '¥9.9' },
-    '虚假号码识别': { icon: '🚫', bgColor: '#FFEBEE', desc: '识别虚假/虚拟手机号码', price: '¥3.0' },
+    '实名核验': { icon: '🪪', bgColor: '#E8F5E9', desc: '验证姓名与身份证号是否匹配', price: '¥2.9' },
+    '人像比对': { icon: '📷', bgColor: '#E8F5E9', desc: '身份证照片与本人人脸比对', price: '¥2.9' },
+    '身份证二要素': { icon: '🪪', bgColor: '#E8F5E9', desc: '身份证姓名与号码一致性核验', price: '¥2.9' },
+    '手机三要素': { icon: '📱', bgColor: '#E3F2FD', desc: '姓名+身份证+手机号一致性核验', price: '¥2.9' },
+    '银行卡三要素': { icon: '💳', bgColor: '#E0F7FA', desc: '姓名+身份证+银行卡一致性核验', price: '¥2.9' },
+    '护照核验': { icon: '📘', bgColor: '#E3F2FD', desc: '护照信息真伪核验', price: '¥2.9' },
+    '驾照核验': { icon: '🚘', bgColor: '#FFF3E0', desc: '驾驶证信息真伪核验', price: '¥2.9' },
+    '学历查询': { icon: '🎓', bgColor: '#F1F8E9', desc: '学历证书真伪查询', price: '¥2.9' },
+    '个人征信': { icon: '👤', bgColor: '#E0F7FA', desc: '个人征信报告查询', price: '¥2.9' },
+    '社交账号检测': { icon: '⭐', bgColor: '#FFF3E0', desc: '社交平台账号真实性检测', price: '¥2.9' },
+    '虚假号码识别': { icon: '🚫', bgColor: '#FFEBEE', desc: '识别虚假/虚拟手机号码', price: '¥2.9' },
   },
   carrier: {
     '号码标记查询': { icon: '📱', bgColor: '#E3F2FD', desc: '查询手机号码的标记信息', price: '免费' },
     '号码归属地': { icon: '📍', bgColor: '#E3F2FD', desc: '查询手机号码归属地信息', price: '免费' },
-    '取消标记': { icon: '✅', bgColor: '#E8F5E9', desc: '消除错误标记，恢复号码信誉', price: '¥9.9' },
-    '号码估值': { icon: '💎', bgColor: '#FFF3E0', desc: '靓号评估与价值分析', price: '¥19.9' },
-    '号码状态': { icon: '🔄', bgColor: '#E3F2FD', desc: '查询手机号码在网状态', price: '¥3.0' },
-    '运营商认证': { icon: '📶', bgColor: '#E3F2FD', desc: '运营商实名认证查询', price: '¥5.0' },
-    '携号转网': { icon: '🔀', bgColor: '#F3E5F5', desc: '查询号码携号转网状态', price: '¥3.0' },
-    '虚拟号码检测': { icon: '💳', bgColor: '#E0F7FA', desc: '检测虚拟运营商号码', price: '¥5.0' },
+    '取消标记': { icon: '✅', bgColor: '#E8F5E9', desc: '消除错误标记，恢复号码信誉', price: '¥2.9' },
+    '号码估值': { icon: '💎', bgColor: '#FFF3E0', desc: '靓号评估与价值分析', price: '¥2.9' },
+    '号码状态': { icon: '🔄', bgColor: '#E3F2FD', desc: '查询手机号码在网状态', price: '¥2.9' },
+    '运营商认证': { icon: '📶', bgColor: '#E3F2FD', desc: '运营商实名认证查询', price: '¥2.9' },
+    '携号转网': { icon: '🔀', bgColor: '#F3E5F5', desc: '查询号码携号转网状态', price: '¥2.9' },
+    '虚拟号码检测': { icon: '💳', bgColor: '#E0F7FA', desc: '检测虚拟运营商号码', price: '¥2.9' },
     '骚扰电话识别': { icon: '📵', bgColor: '#FFEBEE', desc: '识别骚扰/诈骗电话号码', price: '免费' },
-    '亲情号码': { icon: '📞', bgColor: '#FCE4EC', desc: '查询号码关联亲情号码', price: '¥3.0' },
+    '亲情号码': { icon: '📞', bgColor: '#FCE4EC', desc: '查询号码关联亲情号码', price: '¥2.9' },
   },
   marriage: {
-    '婚姻状态查询': { icon: '💍', bgColor: '#FCE4EC', desc: '查询个人婚姻登记状态', price: '¥49.9' },
-    '婚恋交友核验': { icon: '💑', bgColor: '#FCE4EC', desc: '核实对方真实身份与婚姻状况', price: '¥99.0' },
-    '婚姻登记查询': { icon: '📜', bgColor: '#FFF3E0', desc: '查询婚姻登记记录信息', price: '¥49.9' },
-    '离婚记录查询': { icon: '💍', bgColor: '#FCE4EC', desc: '查询离婚登记记录', price: '¥59.0' },
-    '重婚查询': { icon: '✅', bgColor: '#E8F5E9', desc: '查询是否存在重婚记录', price: '¥99.0' },
-    '情感风险评估': { icon: '💑', bgColor: '#FCE4EC', desc: '评估情感关系风险等级', price: '¥79.0' },
-    '伴侣背调': { icon: '✅', bgColor: '#E8F5E9', desc: '全面伴侣背景调查', price: '¥129.0' },
-    '婚前调查': { icon: '💑', bgColor: '#FCE4EC', desc: '婚前全面背景调查', price: '¥199.0' },
+    '婚姻状态查询': { icon: '💍', bgColor: '#FCE4EC', desc: '查询个人婚姻登记状态', price: '¥2.9' },
+    '婚恋交友核验': { icon: '💑', bgColor: '#FCE4EC', desc: '核实对方真实身份与婚姻状况', price: '¥2.9' },
+    '婚姻登记查询': { icon: '📜', bgColor: '#FFF3E0', desc: '查询婚姻登记记录信息', price: '¥2.9' },
+    '离婚记录查询': { icon: '💍', bgColor: '#FCE4EC', desc: '查询离婚登记记录', price: '¥2.9' },
+    '重婚查询': { icon: '✅', bgColor: '#E8F5E9', desc: '查询是否存在重婚记录', price: '¥2.9' },
+    '情感风险评估': { icon: '💑', bgColor: '#FCE4EC', desc: '评估情感关系风险等级', price: '¥2.9' },
+    '伴侣背调': { icon: '✅', bgColor: '#E8F5E9', desc: '全面伴侣背景调查', price: '¥2.9' },
+    '婚前调查': { icon: '💑', bgColor: '#FCE4EC', desc: '婚前全面背景调查', price: '¥2.9' },
   },
   risk: {
-    '司法诉讼查询': { icon: '⚖️', bgColor: '#F3E5F5', desc: '查询个人或企业涉诉信息', price: '¥29.9' },
-    '法院公告': { icon: '🔨', bgColor: '#F3E5F5', desc: '查询法院公告信息', price: '¥19.9' },
-    '失信被执行人': { icon: '🚫', bgColor: '#FFEBEE', desc: '查询老赖失信被执行人信息', price: '¥19.9' },
-    '限制高消费': { icon: '⛔', bgColor: '#FFEBEE', desc: '查询限制高消费人员信息', price: '¥19.9' },
-    '裁判文书': { icon: '⚖️', bgColor: '#F3E5F5', desc: '查询裁判文书信息', price: '¥29.9' },
-    '开庭公告': { icon: '🚔', bgColor: '#F3E5F5', desc: '查询开庭公告信息', price: '¥19.9' },
-    '执行信息': { icon: '🚔', bgColor: '#F3E5F5', desc: '查询执行案件信息', price: '¥19.9' },
-    '司法拍卖': { icon: '📱', bgColor: '#E3F2FD', desc: '查询司法拍卖标的物信息', price: '¥29.9' },
-    '立案信息': { icon: '🎲', bgColor: '#FFF3E0', desc: '查询案件立案信息', price: '¥19.9' },
-    '行政处罚': { icon: '⚡', bgColor: '#FFF3E0', desc: '查询行政处罚记录', price: '¥19.9' },
-    '税务违法': { icon: '🏴', bgColor: '#F3E5F5', desc: '查询税务违法记录', price: '¥19.9' },
-    '网贷黑名单': { icon: '⚖️', bgColor: '#F3E5F5', desc: '查询网贷黑名单信息', price: '¥9.9' },
-    '涉诉风险评估': { icon: '🎲', bgColor: '#FFF3E0', desc: '综合评估涉诉风险等级', price: '¥49.9' },
+    '司法诉讼查询': { icon: '⚖️', bgColor: '#F3E5F5', desc: '查询个人或企业涉诉信息', price: '¥2.9' },
+    '法院公告': { icon: '🔨', bgColor: '#F3E5F5', desc: '查询法院公告信息', price: '¥2.9' },
+    '失信被执行人': { icon: '🚫', bgColor: '#FFEBEE', desc: '查询老赖失信被执行人信息', price: '¥2.9' },
+    '限制高消费': { icon: '⛔', bgColor: '#FFEBEE', desc: '查询限制高消费人员信息', price: '¥2.9' },
+    '裁判文书': { icon: '⚖️', bgColor: '#F3E5F5', desc: '查询裁判文书信息', price: '¥2.9' },
+    '开庭公告': { icon: '🚔', bgColor: '#F3E5F5', desc: '查询开庭公告信息', price: '¥2.9' },
+    '执行信息': { icon: '🚔', bgColor: '#F3E5F5', desc: '查询执行案件信息', price: '¥2.9' },
+    '司法拍卖': { icon: '📱', bgColor: '#E3F2FD', desc: '查询司法拍卖标的物信息', price: '¥2.9' },
+    '立案信息': { icon: '🎲', bgColor: '#FFF3E0', desc: '查询案件立案信息', price: '¥2.9' },
+    '行政处罚': { icon: '⚡', bgColor: '#FFF3E0', desc: '查询行政处罚记录', price: '¥2.9' },
+    '税务违法': { icon: '🏴', bgColor: '#F3E5F5', desc: '查询税务违法记录', price: '¥2.9' },
+    '网贷黑名单': { icon: '⚖️', bgColor: '#F3E5F5', desc: '查询网贷黑名单信息', price: '¥2.9' },
+    '涉诉风险评估': { icon: '🎲', bgColor: '#FFF3E0', desc: '综合评估涉诉风险等级', price: '¥2.9' },
   },
   finance: {
-    '个人信用报告': { icon: '📊', bgColor: '#E0F7FA', desc: '全面个人信用风险评估报告', price: '¥99.0' },
-    '多头借贷检测': { icon: '🔍', bgColor: '#E0F7FA', desc: '检测是否存在多头借贷行为', price: '¥49.9' },
-    '网贷记录查询': { icon: '💳', bgColor: '#E0F7FA', desc: '查询网贷平台借贷记录', price: '¥29.9' },
-    '逾期记录查询': { icon: '💳', bgColor: '#E0F7FA', desc: '查询逾期还款记录', price: '¥29.9' },
-    '银行卡黑名单': { icon: '✅', bgColor: '#E8F5E9', desc: '查询银行卡是否在黑名单中', price: '¥19.9' },
-    '反欺诈检测': { icon: '📊', bgColor: '#E0F7FA', desc: '综合反欺诈风险评估', price: '¥49.9' },
-    'P2P记录': { icon: '🏦', bgColor: '#E8EAF6', desc: '查询P2P平台借贷记录', price: '¥29.9' },
-    '小贷记录': { icon: '🏦', bgColor: '#E8EAF6', desc: '查询小额贷款记录', price: '¥29.9' },
-    '消费金融': { icon: '🏦', bgColor: '#E8EAF6', desc: '查询消费金融借贷记录', price: '¥29.9' },
-    '信用评分': { icon: '🎯', bgColor: '#FFF3E0', desc: '个人信用评分查询', price: '¥19.9' },
-    '资产调查': { icon: '📁', bgColor: '#FFF3E0', desc: '个人资产状况调查', price: '¥99.0' },
-    '企业信用': { icon: '📊', bgColor: '#E0F7FA', desc: '企业信用评级查询', price: '¥49.9' },
-    '个人破产': { icon: '✅', bgColor: '#E8F5E9', desc: '查询个人破产记录', price: '¥29.9' },
-    '网贷催收': { icon: '⛔', bgColor: '#FFEBEE', desc: '查询网贷催收记录', price: '¥19.9' },
-    '风险画像': { icon: '📈', bgColor: '#E0F7FA', desc: '个人风险画像分析', price: '¥79.0' },
-    '关联风险': { icon: '💳', bgColor: '#E0F7FA', desc: '关联人风险传导分析', price: '¥49.9' },
-    '资金异常': { icon: '🔍', bgColor: '#E0F7FA', desc: '资金流水异常检测', price: '¥49.9' },
-    '洗钱风险': { icon: '📱', bgColor: '#E3F2FD', desc: '反洗钱风险评估', price: '¥99.0' },
-    '投资风险': { icon: '💰', bgColor: '#FFF3E0', desc: '投资理财风险评估', price: '¥49.9' },
-    '征信修复': { icon: '✅', bgColor: '#E8F5E9', desc: '征信修复方案咨询', price: '¥199.0' },
-    '风险综合评估': { icon: '🔍', bgColor: '#E0F7FA', desc: '全面风险综合评估报告', price: '¥149.0' },
+    '个人信用报告': { icon: '📊', bgColor: '#E0F7FA', desc: '全面个人信用风险评估报告', price: '¥2.9' },
+    '多头借贷检测': { icon: '🔍', bgColor: '#E0F7FA', desc: '检测是否存在多头借贷行为', price: '¥2.9' },
+    '网贷记录查询': { icon: '💳', bgColor: '#E0F7FA', desc: '查询网贷平台借贷记录', price: '¥2.9' },
+    '逾期记录查询': { icon: '💳', bgColor: '#E0F7FA', desc: '查询逾期还款记录', price: '¥2.9' },
+    '银行卡黑名单': { icon: '✅', bgColor: '#E8F5E9', desc: '查询银行卡是否在黑名单中', price: '¥2.9' },
+    '反欺诈检测': { icon: '📊', bgColor: '#E0F7FA', desc: '综合反欺诈风险评估', price: '¥2.9' },
+    'P2P记录': { icon: '🏦', bgColor: '#E8EAF6', desc: '查询P2P平台借贷记录', price: '¥2.9' },
+    '小贷记录': { icon: '🏦', bgColor: '#E8EAF6', desc: '查询小额贷款记录', price: '¥2.9' },
+    '消费金融': { icon: '🏦', bgColor: '#E8EAF6', desc: '查询消费金融借贷记录', price: '¥2.9' },
+    '信用评分': { icon: '🎯', bgColor: '#FFF3E0', desc: '个人信用评分查询', price: '¥2.9' },
+    '资产调查': { icon: '📁', bgColor: '#FFF3E0', desc: '个人资产状况调查', price: '¥2.9' },
+    '企业信用': { icon: '📊', bgColor: '#E0F7FA', desc: '企业信用评级查询', price: '¥2.9' },
+    '个人破产': { icon: '✅', bgColor: '#E8F5E9', desc: '查询个人破产记录', price: '¥2.9' },
+    '网贷催收': { icon: '⛔', bgColor: '#FFEBEE', desc: '查询网贷催收记录', price: '¥2.9' },
+    '风险画像': { icon: '📈', bgColor: '#E0F7FA', desc: '个人风险画像分析', price: '¥2.9' },
+    '关联风险': { icon: '💳', bgColor: '#E0F7FA', desc: '关联人风险传导分析', price: '¥2.9' },
+    '资金异常': { icon: '🔍', bgColor: '#E0F7FA', desc: '资金流水异常检测', price: '¥2.9' },
+    '洗钱风险': { icon: '📱', bgColor: '#E3F2FD', desc: '反洗钱风险评估', price: '¥2.9' },
+    '投资风险': { icon: '💰', bgColor: '#FFF3E0', desc: '投资理财风险评估', price: '¥2.9' },
+    '征信修复': { icon: '✅', bgColor: '#E8F5E9', desc: '征信修复方案咨询', price: '¥2.9' },
+    '风险综合评估': { icon: '🔍', bgColor: '#E0F7FA', desc: '全面风险综合评估报告', price: '¥2.9' },
   },
   car: {
-    '车辆信息查询': { icon: '🚗', bgColor: '#FFF3E0', desc: '查询车辆基本信息与状态', price: '¥29.9' },
-    '车辆违章查询': { icon: '🚕', bgColor: '#FFF3E0', desc: '查询车辆违章记录', price: '¥9.9' },
-    '车辆估值': { icon: '📏', bgColor: '#FFF3E0', desc: '车辆市场价值评估', price: '¥19.9' },
-    '车辆出险记录': { icon: '📏', bgColor: '#FFF3E0', desc: '查询车辆保险出险记录', price: '¥29.9' },
-    '车辆年检': { icon: '📏', bgColor: '#FFF3E0', desc: '查询车辆年检信息', price: '¥9.9' },
-    '车辆过户记录': { icon: '🔍', bgColor: '#E0F7FA', desc: '查询车辆过户历史记录', price: '¥19.9' },
-    '驾驶证扣分': { icon: '🛣️', bgColor: '#E8EAF6', desc: '查询驾驶证扣分情况', price: '¥9.9' },
-    '车辆抵押': { icon: '📏', bgColor: '#FFF3E0', desc: '查询车辆抵押状态信息', price: '¥19.9' },
-    '车辆保险': { icon: '📏', bgColor: '#FFF3E0', desc: '查询车辆保险信息', price: '¥9.9' },
-    '二手车检测': { icon: '🔧', bgColor: '#F1F8E9', desc: '二手车全面检测报告', price: '¥49.9' },
-    '车牌归属': { icon: '🔄', bgColor: '#E3F2FD', desc: '查询车牌归属地信息', price: '¥3.0' },
-    '事故记录': { icon: '✅', bgColor: '#E8F5E9', desc: '查询车辆事故记录', price: '¥19.9' },
-    '维保记录': { icon: '💥', bgColor: '#FFEBEE', desc: '查询车辆维修保养记录', price: '¥29.9' },
-    '车辆召回': { icon: '✅', bgColor: '#E8F5E9', desc: '查询车辆召回信息', price: '¥3.0' },
-    '新车比价': { icon: '🚗', bgColor: '#FFF3E0', desc: '新车价格对比查询', price: '¥9.9' },
-    '违章代缴': { icon: '✅', bgColor: '#E8F5E9', desc: '违章罚款代缴服务', price: '¥9.9+服务费' },
+    '车辆信息查询': { icon: '🚗', bgColor: '#FFF3E0', desc: '查询车辆基本信息与状态', price: '¥2.9' },
+    '车辆违章查询': { icon: '🚕', bgColor: '#FFF3E0', desc: '查询车辆违章记录', price: '¥2.9' },
+    '车辆估值': { icon: '📏', bgColor: '#FFF3E0', desc: '车辆市场价值评估', price: '¥2.9' },
+    '车辆出险记录': { icon: '📏', bgColor: '#FFF3E0', desc: '查询车辆保险出险记录', price: '¥2.9' },
+    '车辆年检': { icon: '📏', bgColor: '#FFF3E0', desc: '查询车辆年检信息', price: '¥2.9' },
+    '车辆过户记录': { icon: '🔍', bgColor: '#E0F7FA', desc: '查询车辆过户历史记录', price: '¥2.9' },
+    '驾驶证扣分': { icon: '🛣️', bgColor: '#E8EAF6', desc: '查询驾驶证扣分情况', price: '¥2.9' },
+    '车辆抵押': { icon: '📏', bgColor: '#FFF3E0', desc: '查询车辆抵押状态信息', price: '¥2.9' },
+    '车辆保险': { icon: '📏', bgColor: '#FFF3E0', desc: '查询车辆保险信息', price: '¥2.9' },
+    '二手车检测': { icon: '🔧', bgColor: '#F1F8E9', desc: '二手车全面检测报告', price: '¥2.9' },
+    '车牌归属': { icon: '🔄', bgColor: '#E3F2FD', desc: '查询车牌归属地信息', price: '¥2.9' },
+    '事故记录': { icon: '✅', bgColor: '#E8F5E9', desc: '查询车辆事故记录', price: '¥2.9' },
+    '维保记录': { icon: '💥', bgColor: '#FFEBEE', desc: '查询车辆维修保养记录', price: '¥2.9' },
+    '车辆召回': { icon: '✅', bgColor: '#E8F5E9', desc: '查询车辆召回信息', price: '¥2.9' },
+    '新车比价': { icon: '🚗', bgColor: '#FFF3E0', desc: '新车价格对比查询', price: '¥2.9' },
+    '违章代缴': { icon: '✅', bgColor: '#E8F5E9', desc: '违章罚款代缴服务', price: '¥2.9+服务费' },
   },
   package: {
-    '企业工商信息': { icon: '🏢', bgColor: '#E8EAF6', desc: '查询企业工商注册详细信息', price: '¥9.9' },
-    '企业关联关系': { icon: '🔗', bgColor: '#E8EAF6', desc: '查询企业股东与投资关系', price: '¥19.9' },
-    '企业股东信息': { icon: '👔', bgColor: '#E8EAF6', desc: '查询企业股东详细信息', price: '¥19.9' },
-    '企业风险扫描': { icon: '💰', bgColor: '#FFF3E0', desc: '全面扫描企业经营风险', price: '¥49.9' },
-    '企业经营异常': { icon: '🏠', bgColor: '#FFEBEE', desc: '查询企业经营异常名录', price: '¥19.9' },
-    '企业失信查询': { icon: '🏢', bgColor: '#E8EAF6', desc: '查询企业失信被执行信息', price: '¥19.9' },
-    '企业法人查询': { icon: '👤', bgColor: '#E8F5E9', desc: '查询企业法定代表人信息', price: '¥19.9' },
-    '企业年报': { icon: '📊', bgColor: '#E0F7FA', desc: '查询企业年报信息', price: '¥9.9' },
-    '企业对外投资': { icon: '🏢', bgColor: '#E8EAF6', desc: '查询企业对外投资情况', price: '¥29.9' },
+    '企业工商信息': { icon: '🏢', bgColor: '#E8EAF6', desc: '查询企业工商注册详细信息', price: '¥2.9' },
+    '企业关联关系': { icon: '🔗', bgColor: '#E8EAF6', desc: '查询企业股东与投资关系', price: '¥2.9' },
+    '企业股东信息': { icon: '👔', bgColor: '#E8EAF6', desc: '查询企业股东详细信息', price: '¥2.9' },
+    '企业风险扫描': { icon: '💰', bgColor: '#FFF3E0', desc: '全面扫描企业经营风险', price: '¥2.9' },
+    '企业经营异常': { icon: '🏠', bgColor: '#FFEBEE', desc: '查询企业经营异常名录', price: '¥2.9' },
+    '企业失信查询': { icon: '🏢', bgColor: '#E8EAF6', desc: '查询企业失信被执行信息', price: '¥2.9' },
+    '企业法人查询': { icon: '👤', bgColor: '#E8F5E9', desc: '查询企业法定代表人信息', price: '¥2.9' },
+    '企业年报': { icon: '📊', bgColor: '#E0F7FA', desc: '查询企业年报信息', price: '¥2.9' },
+    '企业对外投资': { icon: '🏢', bgColor: '#E8EAF6', desc: '查询企业对外投资情况', price: '¥2.9' },
   },
   report: {
-    '深度背调报告': { icon: '📋', bgColor: '#F1F8E9', desc: '全面个人背景调查报告', price: '¥199.0' },
-    '企业尽调报告': { icon: '📊', bgColor: '#F1F8E9', desc: '企业尽职调查深度报告', price: '¥299.0' },
+    '深度背调报告': { icon: '📋', bgColor: '#F1F8E9', desc: '全面个人背景调查报告', price: '¥9.9' },
+    '企业尽调报告': { icon: '📊', bgColor: '#F1F8E9', desc: '企业尽职调查深度报告', price: '¥9.9' },
   },
 };
 
@@ -396,16 +435,36 @@ function onQuery() {
     }
   }
 
-  // 如果是企业查询，跳转到公司结果页
-  if (typeCode.value === 'package' && form.companyName) {
-    uni.navigateTo({
-      url: `/pages/hcc/company-result?companyName=${encodeURIComponent(form.companyName)}`,
-    });
+  // 免费服务：直接查询
+  if (serviceInfo.value.price === '免费') {
+    handleFreeQuery();
     return;
   }
 
-  // 其他服务 - 即将上线提示
-  uni.showToast({ title: '该服务即将上线，敬请期待', icon: 'none' });
+  // 付费服务：跳转到支付页
+  uni.navigateTo({
+    url: `/pages/pay/index?name=${encodeURIComponent(name.value)}&price=${encodeURIComponent(serviceInfo.value.price)}&typeCode=${typeCode.value}`,
+  });
+}
+
+async function handleFreeQuery() {
+  // carrier: 号码标记/归属地查询
+  if (typeCode.value === 'carrier' && (name.value === '号码标记查询' || name.value === '号码归属地')) {
+    const r = queryPhoneLabels(form.phone);
+    uni.navigateTo({ url: `/pages/hcc/result?number=${encodeURIComponent(form.phone)}&_t=${Date.now()}` });
+    return;
+  }
+
+  // 暂时免费的话直接到结果页
+  if (name.value === '骚扰电话识别') {
+    const r = queryPhoneLabels(form.phone);
+    uni.navigateTo({ url: `/pages/hcc/result?number=${encodeURIComponent(form.phone)}&_t=${Date.now()}` });
+    return;
+  }
+}
+
+function onPaid() {
+  // 占位
 }
 </script>
 

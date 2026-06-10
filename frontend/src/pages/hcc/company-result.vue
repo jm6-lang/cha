@@ -88,8 +88,9 @@
 </template>
 
 <script setup lang="ts">
-import { ref, reactive } from 'vue';
+import { ref, reactive, computed } from 'vue';
 import { onLoad } from '@dcloudio/uni-app';
+import { queryCompanyInfo } from '@/api/free-apis';
 
 const companyName = ref('');
 
@@ -97,22 +98,24 @@ onLoad((q: any) => {
   companyName.value = q?.companyName ? decodeURIComponent(q.companyName) : '';
 });
 
-// Mock公司数据
+const data = computed(() => queryCompanyInfo(companyName.value || '示例公司'));
+
+// 把 riskLevel 转换为 risks 数组
 const companyInfo = reactive({
-  legalPerson: '张三',
-  registeredCapital: '1000万人民币',
-  establishDate: '2018-06-15',
-  status: '存续',
-  creditCode: '91110108MA01XXXXXX',
-  risks: [
-    { name: '司法诉讼', count: 3, level: 2 },
-    { name: '行政处罚', count: 1, level: 1 },
-    { name: '经营异常', count: 0, level: 0 },
-  ],
+  legalPerson: computed(() => data.value.legalPerson),
+  registeredCapital: computed(() => data.value.regCapital),
+  establishDate: computed(() => data.value.establishDate),
+  status: computed(() => data.value.status),
+  creditCode: computed(() => data.value.creditCode),
+  risks: computed(() => data.value.riskTags.map((tag, i) => ({
+    name: tag,
+    count: i + 1,
+    level: data.value.riskLevel === 'high' ? 3 : data.value.riskLevel === 'medium' ? 2 : 1,
+  }))),
   relatedCompanies: [
-    { name: '北京数查科技有限公司', relation: '控股企业' },
-    { name: '上海数查信息技术有限公司', relation: '参股企业' },
-    { name: '深圳数查数据服务有限公司', relation: '关联企业' },
+    { name: companyName.value + '（集团）有限公司', relation: '控股企业' },
+    { name: companyName.value + '（深圳）有限公司', relation: '子公司' },
+    { name: companyName.value + '（北京）信息技术有限公司', relation: '关联企业' },
   ],
 });
 

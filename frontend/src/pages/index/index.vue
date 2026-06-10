@@ -150,6 +150,7 @@
 <script setup lang="ts">
 import { ref, computed } from 'vue';
 import { onShow } from '@dcloudio/uni-app';
+import { queryPhoneLocation, queryPhoneLabels } from '@/api/free-apis';
 
 const statusBarHeight = ref(44);
 const searchValue = ref('');
@@ -185,30 +186,30 @@ const allServices = [
   // 号码服务
   { name: '号码标记查询', icon: '📱', bgColor: '#E3F2FD', desc: '查询手机号码的标记信息', price: '', tag: '免费', tagBg: '#E8F8EF', tagColor: '#07C160', typeCode: 'carrier' },
   { name: '号码归属地', icon: '📍', bgColor: '#E3F2FD', desc: '查询手机号码归属地信息', price: '', tag: '免费', tagBg: '#E8F8EF', tagColor: '#07C160', typeCode: 'carrier' },
-  { name: '取消标记', icon: '✅', bgColor: '#E8F5E9', desc: '消除错误标记，恢复号码信誉', price: '9.9', tag: '热门', tagBg: '#FFF0E8', tagColor: '#FF8F1F', typeCode: 'carrier' },
-  { name: '号码估值', icon: '💎', bgColor: '#FFF3E0', desc: '靓号评估与价值分析', price: '19.9', tag: '', tagBg: '', tagColor: '', typeCode: 'carrier' },
+  { name: '取消标记', icon: '✅', bgColor: '#E8F5E9', desc: '消除错误标记，恢复号码信誉', price: '2.9', tag: '热门', tagBg: '#FFF0E8', tagColor: '#FF8F1F', typeCode: 'carrier' },
+  { name: '号码估值', icon: '💎', bgColor: '#FFF3E0', desc: '靓号评估与价值分析', price: '2.9', tag: '', tagBg: '', tagColor: '', typeCode: 'carrier' },
   // 身份核验
-  { name: '实名核验', icon: '🪪', bgColor: '#E8F5E9', desc: '验证姓名与身份证号是否匹配', price: '5.0', tag: '', tagBg: '', tagColor: '', typeCode: 'identity' },
-  { name: '人像比对', icon: '📷', bgColor: '#E8F5E9', desc: '身份证照片与本人人脸比对', price: '8.0', tag: '', tagBg: '', tagColor: '', typeCode: 'identity' },
+  { name: '实名核验', icon: '🪪', bgColor: '#E8F5E9', desc: '验证姓名与身份证号是否匹配', price: '2.9', tag: '', tagBg: '', tagColor: '', typeCode: 'identity' },
+  { name: '人像比对', icon: '📷', bgColor: '#E8F5E9', desc: '身份证照片与本人人脸比对', price: '2.9', tag: '', tagBg: '', tagColor: '', typeCode: 'identity' },
   // 婚姻情感
-  { name: '婚姻状态查询', icon: '💍', bgColor: '#FCE4EC', desc: '查询个人婚姻登记状态', price: '49.9', tag: '热门', tagBg: '#FFF0E8', tagColor: '#FF8F1F', typeCode: 'marriage' },
-  { name: '婚恋交友核验', icon: '💑', bgColor: '#FCE4EC', desc: '核实对方真实身份与婚姻状况', price: '99.0', tag: '', tagBg: '', tagColor: '', typeCode: 'marriage' },
+  { name: '婚姻状态查询', icon: '💍', bgColor: '#FCE4EC', desc: '查询个人婚姻登记状态', price: '2.9', tag: '热门', tagBg: '#FFF0E8', tagColor: '#FF8F1F', typeCode: 'marriage' },
+  { name: '婚恋交友核验', icon: '💑', bgColor: '#FCE4EC', desc: '核实对方真实身份与婚姻状况', price: '2.9', tag: '', tagBg: '', tagColor: '', typeCode: 'marriage' },
   // 司法涉诉
-  { name: '司法诉讼查询', icon: '⚖️', bgColor: '#F3E5F5', desc: '查询个人或企业涉诉信息', price: '29.9', tag: '', tagBg: '', tagColor: '', typeCode: 'risk' },
-  { name: '失信被执行人', icon: '🚫', bgColor: '#FFEBEE', desc: '查询老赖失信被执行人信息', price: '19.9', tag: '热门', tagBg: '#FFF0E8', tagColor: '#FF8F1F', typeCode: 'risk' },
-  { name: '限制高消费', icon: '⛔', bgColor: '#FFEBEE', desc: '查询限制高消费人员信息', price: '19.9', tag: '', tagBg: '', tagColor: '', typeCode: 'risk' },
+  { name: '司法诉讼查询', icon: '⚖️', bgColor: '#F3E5F5', desc: '查询个人或企业涉诉信息', price: '2.9', tag: '', tagBg: '', tagColor: '', typeCode: 'risk' },
+  { name: '失信被执行人', icon: '🚫', bgColor: '#FFEBEE', desc: '查询老赖失信被执行人信息', price: '2.9', tag: '热门', tagBg: '#FFF0E8', tagColor: '#FF8F1F', typeCode: 'risk' },
+  { name: '限制高消费', icon: '⛔', bgColor: '#FFEBEE', desc: '查询限制高消费人员信息', price: '2.9', tag: '', tagBg: '', tagColor: '', typeCode: 'risk' },
   // 金融风控
-  { name: '个人信用报告', icon: '📊', bgColor: '#E0F7FA', desc: '全面个人信用风险评估报告', price: '99.0', tag: '', tagBg: '', tagColor: '', typeCode: 'finance' },
-  { name: '多头借贷检测', icon: '🔍', bgColor: '#E0F7FA', desc: '检测是否存在多头借贷行为', price: '49.9', tag: '', tagBg: '', tagColor: '', typeCode: 'finance' },
+  { name: '个人信用报告', icon: '📊', bgColor: '#E0F7FA', desc: '全面个人信用风险评估报告', price: '2.9', tag: '', tagBg: '', tagColor: '', typeCode: 'finance' },
+  { name: '多头借贷检测', icon: '🔍', bgColor: '#E0F7FA', desc: '检测是否存在多头借贷行为', price: '2.9', tag: '', tagBg: '', tagColor: '', typeCode: 'finance' },
   // 车辆查询
-  { name: '车辆信息查询', icon: '🚗', bgColor: '#FFF3E0', desc: '查询车辆基本信息与状态', price: '29.9', tag: '', tagBg: '', tagColor: '', typeCode: 'car' },
-  { name: '车辆违章查询', icon: '🚕', bgColor: '#FFF3E0', desc: '查询车辆违章记录', price: '9.9', tag: '', tagBg: '', tagColor: '', typeCode: 'car' },
+  { name: '车辆信息查询', icon: '🚗', bgColor: '#FFF3E0', desc: '查询车辆基本信息与状态', price: '2.9', tag: '', tagBg: '', tagColor: '', typeCode: 'car' },
+  { name: '车辆违章查询', icon: '🚕', bgColor: '#FFF3E0', desc: '查询车辆违章记录', price: '2.9', tag: '', tagBg: '', tagColor: '', typeCode: 'car' },
   // 企业查询
-  { name: '企业工商信息', icon: '🏢', bgColor: '#E8EAF6', desc: '查询企业工商注册详细信息', price: '9.9', tag: '', tagBg: '', tagColor: '', typeCode: 'package' },
-  { name: '企业关联关系', icon: '🔗', bgColor: '#E8EAF6', desc: '查询企业股东与投资关系', price: '19.9', tag: '', tagBg: '', tagColor: '', typeCode: 'package' },
+  { name: '企业工商信息', icon: '🏢', bgColor: '#E8EAF6', desc: '查询企业工商注册详细信息', price: '2.9', tag: '', tagBg: '', tagColor: '', typeCode: 'package' },
+  { name: '企业关联关系', icon: '🔗', bgColor: '#E8EAF6', desc: '查询企业股东与投资关系', price: '2.9', tag: '', tagBg: '', tagColor: '', typeCode: 'package' },
   // 专业报告
-  { name: '深度背调报告', icon: '📋', bgColor: '#F1F8E9', desc: '全面个人背景调查报告', price: '199.0', tag: '专业', tagBg: '#E8F0FF', tagColor: '#1A6CFF', typeCode: 'report' },
-  { name: '企业尽调报告', icon: '📊', bgColor: '#F1F8E9', desc: '企业尽职调查深度报告', price: '299.0', tag: '专业', tagBg: '#E8F0FF', tagColor: '#1A6CFF', typeCode: 'report' },
+  { name: '深度背调报告', icon: '📋', bgColor: '#F1F8E9', desc: '全面个人背景调查报告', price: '9.9', tag: '专业', tagBg: '#E8F0FF', tagColor: '#1A6CFF', typeCode: 'report' },
+  { name: '企业尽调报告', icon: '📊', bgColor: '#F1F8E9', desc: '企业尽职调查深度报告', price: '9.9', tag: '专业', tagBg: '#E8F0FF', tagColor: '#1A6CFF', typeCode: 'report' },
 ];
 
 const displayServices = computed(() => {
@@ -227,10 +228,37 @@ function onSearch() {
       uni.showToast({ title: '请输入7-13位号码', icon: 'none' });
       return;
     }
-    uni.navigateTo({ url: `/pages/hcc/result?number=${encodeURIComponent(val)}` });
+    // 直接调用本地查询（免费服务，零延迟）
+    const result = queryPhoneLabels(val);
+    // 保存到本地历史
+    saveHistory(val, result.province, result.carrier, result.labels.length);
+    uni.navigateTo({ url: `/pages/hcc/result?number=${encodeURIComponent(val)}&_t=${Date.now()}` });
   } else {
     // 查关系 - 公司名称
-    uni.navigateTo({ url: `/pages/hcc/company-result?companyName=${encodeURIComponent(val)}` });
+    const info = queryCompanyInfo(val);
+    uni.navigateTo({ url: `/pages/hcc/company-result?companyName=${encodeURIComponent(val)}&_t=${Date.now()}` });
+  }
+}
+
+function saveHistory(number: string, province: string, carrier: string, labelCount: number) {
+  try {
+    const list: any[] = uni.getStorageSync('shucha_history') || [];
+    // 去重
+    const filtered = list.filter(x => x.number !== number);
+    filtered.unshift({
+      id: Date.now(),
+      number,
+      province,
+      city: '',
+      carrier,
+      labelCount,
+      createTime: new Date().toISOString(),
+    });
+    uni.setStorageSync('shucha_history', filtered.slice(0, 50));
+    // 同步更新首页显示
+    recentQueries.value = filtered.slice(0, 3);
+  } catch (e) {
+    console.error('save history failed', e);
   }
 }
 
@@ -260,7 +288,8 @@ onShow(() => {
   try {
     const h = uni.getStorageSync('shucha_history');
     if (h) {
-      recentQueries.value = JSON.parse(h).slice(0, 3);
+      const list = JSON.parse(h);
+      recentQueries.value = list.slice(0, 3);
     }
   } catch (e) {}
 });

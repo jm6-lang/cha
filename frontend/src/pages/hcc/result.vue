@@ -114,6 +114,7 @@
 import { ref, computed } from 'vue';
 import { onLoad } from '@dcloudio/uni-app';
 import { shuchaApi, type NumberLabel } from '@/api/shucha';
+import { queryPhoneLabels } from '@/api/free-apis';
 
 const number = ref('');
 const data = ref<NumberLabel | null>(null);
@@ -127,8 +128,11 @@ onLoad((q: any) => {
 async function doQuery() {
   loading.value = true;
   try {
-    const res = await shuchaApi.queryNumber(number.value, true);
-    data.value = res.data;
+    // 直接调用本地 free-apis，无延迟
+    const r = queryPhoneLabels(number.value);
+    data.value = r;
+  } catch (e) {
+    console.error('query failed', e);
   } finally {
     loading.value = false;
   }
