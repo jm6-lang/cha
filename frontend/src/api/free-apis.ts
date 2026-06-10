@@ -569,44 +569,47 @@ export function queryPhoneLabels(phone: string): PhoneLabelsResult {
   return { ...loc, labels, platforms: [] };
 }
 
-// ============= 3. IP 归属地查询（ip-api.com 免费接口）============
+// ============= 3. IP 归属地查询（tmini.net ipinfo，精确到区县街道+风险评级）============
 
 export interface IpLocation {
   ip: string;
   country: string;
   region: string;
   city: string;
-  isp: string;
+  district?: string;
+  street?: string;
+  isp?: string;
   lat: number;
   lon: number;
+  /** 风险评分 0-100 */
+  riskScore?: number;
+  /** 风险等级描述 */
+  riskLevel?: string;
+  /** 是否代理 IP */
+  isProxy?: string;
+  /** 风险标签 */
+  riskTag?: string;
 }
 
 export async function queryIpLocation(ip: string): Promise<IpLocation | null> {
-  return new Promise((resolve) => {
-    // ip-api.com 免费，无需 key
-    uni.request({
-      url: `https://ip-api.com/json/${ip}?lang=zh-CN`,
-      method: 'GET',
-      timeout: 5000,
-      success: (res) => {
-        const d: any = res.data;
-        if (d && d.status === 'success') {
-          resolve({
-            ip: d.query,
-            country: d.country || '未知',
-            region: d.regionName || '未知',
-            city: d.city || '未知',
-            isp: d.isp || d.org || '未知',
-            lat: d.lat || 0,
-            lon: d.lon || 0,
-          });
-        } else {
-          resolve(null);
-        }
-      },
-      fail: () => resolve(null),
-    });
-  });
+  const data: any = await tminiGet('ipinfo', { ip });
+  if (!data || data.code !== 0 || !data.data) return null;
+  const d = data.data;
+  return {
+    ip: d.ip,
+    country: d.country || '未知',
+    region: d.province || '未知',
+    city: d.city || '未知',
+    district: d.district,
+    street: d.street,
+    isp: d.isp,
+    lat: parseFloat(d.latitude) || 0,
+    lon: parseFloat(d.longitude) || 0,
+    riskScore: d.risk?.risk_score,
+    riskLevel: d.risk?.risk_level,
+    isProxy: d.risk?.is_proxy,
+    riskTag: d.risk?.risk_tag,
+  };
 }
 
 // ============= 4. 身份证归属地（基于前6位地区码）============
@@ -735,7 +738,7 @@ export function queryIdCardLocation(idCard: string): IdCardInfo {
   };
 }
 
-// ============= 5. 天气查询（wttr.in 免费接口）============
+// ============= 5. 天气查询（tmini.net weather，行政区编码·7天+24小时预报）============
 
 export interface WeatherInfo {
   city: string;
@@ -744,33 +747,55 @@ export interface WeatherInfo {
   feelsLike: string;
   humidity: string;
   wind: string;
+  /** 风向 */
+  windDir?: string;
+  /** 风力等级 */
+  windClass?: string;
+  /** 空气质量 AQI */
+  aqi?: number;
+  /** PM2.5 */
+  pm25?: number;
+  /** 紫外线 */
+  uv?: number;
+  /** 能见度 (米) */
+  vis?: number;
+  /** 数据更新时间 */
+  updateTime?: string;
 }
 
+const CITY_CODE: Record<string, string> = {
+  '北京': '110100', '上海': '310100', '广州': '440100', '深圳': '440300',
+  '杭州': '330100', '南京': '320100', '苏州': '320500', '成都': '510100',
+  '武汉': '420100', '西安': '610100', '重庆': '500100', '天津': '120100',
+  '长沙': '430100', '青岛': '370200', '厦门': '350200', '济南': '370100',
+  '沈阳': '210100', '大连': '210200', '哈尔滨': '230100', '长春': '220100',
+  '太原': '140100', '郑州': '410100', '合肥': '340100', '南昌': '360100',
+  '福州': '350100', '昆明': '530100', '贵阳': '520100', '南宁': '450100',
+  '海口': '460100', '三亚': '460200', '拉萨': '540100', '西宁': '630100',
+  '银川': '640100', '乌鲁木齐': '650100', '兰州': '620100', '呼和浩特': '150100',
+};
+
 export async function queryWeather(city: string): Promise<WeatherInfo | null> {
-  return new Promise((resolve) => {
-    uni.request({
-      url: `https://wttr.in/${encodeURIComponent(city)}?format=j1&lang=zh`,
-      method: 'GET',
-      timeout: 8000,
-      success: (res) => {
-        const d: any = res.data;
-        if (d && d.current_condition && d.current_condition[0]) {
-          const c = d.current_condition[0];
-          resolve({
-            city,
-            desc: c.lang_zh?.[0]?.value || c.weatherDesc?.[0]?.value || '未知',
-            temp: c.temp_C + '°C',
-            feelsLike: c.FeelsLikeC + '°C',
-            humidity: c.humidity + '%',
-            wind: c.windspeedKmph + ' km/h',
-          });
-        } else {
-          resolve(null);
-        }
-      },
-      fail: () => resolve(null),
-    });
-  });
+  const location = CITY_CODE[city] || city;
+  const data: any = await tminiGet('weather', { location });
+  if (!data || data.code !== 0 || !data.data?.now) return null;
+  const n = data.data.now;
+  const loc = data.data.location || {};
+  return {
+    city: loc.name || city,
+    desc: n.text || '未知',
+    temp: `${n.temp}°C`,
+    feelsLike: `${n.feels_like}°C`,
+    humidity: `${n.rh}%`,
+    wind: n.wind_class || '',
+    windDir: n.wind_dir,
+    windClass: n.wind_class,
+    aqi: n.aqi,
+    pm25: n.pm25,
+    uv: n.uv,
+    vis: n.vis,
+    updateTime: n.update_time,
+  };
 }
 
 // ============= 6. 企业信息查询（mock 数据，基于公司名生成）============
@@ -943,4 +968,580 @@ export function queryBankInfo(cardNo: string): { bank: string; cardType: string;
   };
   const info = bankMap[bin];
   return info ? { ...info, bin } : { bank: '未知银行', cardType: '未知', bin };
+}
+
+// =============================================================
+// =========== 以下为 tmini.net 接入的新 API 函数（24个）==========
+// =============================================================
+
+// ============= 10. QQ 信息查询（昵称/头像/性别/星座/地区）============
+export interface QQInfo {
+  uin: number;
+  nickname: string;
+  gender?: string;
+  astro?: string;
+  from?: string;
+  avatarUrl?: string;
+  qzone?: string;
+  vip?: number;
+}
+
+export async function queryQQInfo(qq: string | number): Promise<QQInfo | null> {
+  const data: any = await tminiGet('qqinfo', { qq });
+  if (!data || data.code !== 0 || !data.data || Array.isArray(data.data)) return null;
+  return {
+    uin: data.data.uin,
+    nickname: data.data.nickname,
+    gender: data.data.gender,
+    astro: data.data.astro,
+    from: data.data.from,
+    avatarUrl: data.data.avatarUrl,
+    qzone: data.data.qzone,
+    vip: data.data.qqvip,
+  };
+}
+
+/** QQ 头像直链 */
+export function getQQAvatarUrl(qq: string | number, size: number = 100): string {
+  return `https://tmini.net/api/avatar?qq=${qq}`;
+}
+
+// ============= 11. QQ 冻结检测 =============
+export interface QQCheckResult {
+  status: 'normal' | 'frozen' | 'recovered' | 'limited' | 'unknown';
+  result: number;
+  msg: string;
+}
+
+const QQ_CHECK_STATUS: Record<number, QQCheckResult['status']> = {
+  3: 'normal',
+  8: 'frozen',
+  17: 'normal',
+  7: 'recovered',
+  201: 'limited',
+};
+
+export async function queryQQCheck(uin: string | number): Promise<QQCheckResult | null> {
+  const data: any = await tminiGet('qqcheck', { uin });
+  if (!data || data.code !== 200) return null;
+  return {
+    status: QQ_CHECK_STATUS[data.result] || 'unknown',
+    result: data.result,
+    msg: data.msg || '',
+  };
+}
+
+// ============= 12. QQ 群查询 =============
+export interface QQGroupInfo {
+  groupId: number;
+  groupName: string;
+  memberCount: number;
+  maxMemberCount: number;
+  ownerUin: string;
+  createTime: number;
+  fingerMemo: string;
+}
+
+export async function queryQQGroup(qq: string | number): Promise<QQGroupInfo | null> {
+  const data: any = await tminiGet('group', { qq });
+  if (!data || data.code !== 200 || !data.data) return null;
+  return {
+    groupId: data.data.group_id,
+    groupName: data.data.group_name,
+    memberCount: data.data.member_count,
+    maxMemberCount: data.data.max_member_count,
+    ownerUin: data.data.owner_uin,
+    createTime: data.data.create_time,
+    fingerMemo: data.data.finger_memo,
+  };
+}
+
+// ============= 13. 微信域名拦截查询 =============
+export interface WechatUrlResult {
+  url: string;
+  blocked: boolean;
+  msg: string;
+}
+
+export async function queryWechatUrl(url: string): Promise<WechatUrlResult | null> {
+  const data: any = await tminiGet('wechaturl', { url });
+  if (!data) return null;
+  return {
+    url,
+    blocked: data.code === -3,
+    msg: data.msg || '未知',
+  };
+}
+
+// ============= 14. 今日油价 =============
+export interface OilPriceInfo {
+  province: string;
+  p0: string; // 0号柴油
+  p89: string;
+  p92: string;
+  p95: string;
+  p98: string;
+  updateTime: string;
+}
+
+export async function queryOilPrice(province: string = '广东'): Promise<OilPriceInfo | null> {
+  const data: any = await tminiGet('oil-prices', { province });
+  if (!data || data.status !== 'success' || !data.oil_prices) return null;
+  const o = data.oil_prices;
+  return {
+    province: data.province,
+    p0: o.p0 || '-',
+    p89: o.p89 || '-',
+    p92: o.p92 || '-',
+    p95: o.p95 || '-',
+    p98: o.p98 || '-',
+    updateTime: o.ct || '-',
+  };
+}
+
+// ============= 15. 在线翻译 =============
+export interface TranslationResult {
+  sourceText: string;
+  targetLang: string;
+  translatedText: string;
+  audioUrl?: string;
+}
+
+export async function queryTranslation(text: string, to: string = 'en'): Promise<TranslationResult | null> {
+  const data: any = await tminiGet('translation', { text, to });
+  if (!data || data.code !== 200 || !data.data) return null;
+  return {
+    sourceText: data.data.source_text,
+    targetLang: data.data.target_lang,
+    translatedText: data.data.translated_text,
+    audioUrl: data.data.audio_url,
+  };
+}
+
+export const SUPPORTED_LANGS = [
+  { code: 'zh', name: '中文' }, { code: 'en', name: '英语' }, { code: 'fr', name: '法语' },
+  { code: 'de', name: '德语' }, { code: 'es', name: '西班牙语' }, { code: 'ja', name: '日语' },
+  { code: 'ko', name: '韩语' }, { code: 'ru', name: '俄语' }, { code: 'pt', name: '葡萄牙语' },
+  { code: 'it', name: '意大利语' }, { code: 'ar', name: '阿拉伯语' }, { code: 'hi', name: '印地语' },
+];
+
+// ============= 16. 快递轨迹查询（100+ 快递公司）============
+export interface ExpressPackage {
+  trackingNo: string;
+  cp: string;
+  cpName: string;
+  state: string;
+  signFlag?: string;
+  operateMessage?: string;
+  operateTime?: string;
+  details: Array<{ time: string; context: string; state?: string }>;
+}
+
+export interface ExpressResult {
+  serviceCode: number;
+  packages: ExpressPackage[];
+}
+
+export async function queryExpress(trackingNo: string): Promise<ExpressResult | null> {
+  const data: any = await tminiGet('kuaiok', { trackingNo });
+  if (!data || data.code !== '0000000000' || !data.data) return null;
+  return {
+    serviceCode: data.data.serviceCode,
+    packages: (data.data.packageInfoList || []).map((p: any) => ({
+      trackingNo: p.trackingNo,
+      cp: p.cp,
+      cpName: p.cpName,
+      state: p.state,
+      signFlag: p.signFlag,
+      operateMessage: p.operateMessage,
+      operateTime: p.operateTime,
+      details: (p.trackingDetails || []).map((d: any) => ({
+        time: d.time,
+        context: d.context,
+        state: d.state,
+      })),
+    })),
+  };
+}
+
+// ============= 17. 顺丰快递（需手机尾号后4位）============
+export interface ShunfengResult {
+  mailNo: string;
+  comName: string;
+  state: string;
+  details: Array<{ time: string; context: string; location?: string }>;
+}
+
+export async function queryShunfeng(query: string, phone: string): Promise<ShunfengResult | null> {
+  const data: any = await tminiGet('sfkuaidi', { query, phone });
+  if (!data || data.code !== 200 || !data.data) return null;
+  return {
+    mailNo: data.data.mailNo,
+    comName: data.data.comName,
+    state: data.data.state,
+    details: (data.data.details || []).map((d: any) => ({
+      time: d.time,
+      context: d.context,
+      location: d.location,
+    })),
+  };
+}
+
+// ============= 18. Whois 查询 =============
+export interface WhoisResult {
+  domain: string;
+  creationDate: string;
+  expirationDate: string;
+  updateDate: string;
+  registrar: string;
+  domainStatus: string;
+  nameServers: string;
+  icpCompany?: string;
+  icpLicense?: string;
+  icpType?: string;
+  icpProvince?: string;
+}
+
+export async function queryWhois(keyword: string): Promise<WhoisResult | null> {
+  const data: any = await tminiGet('whois', { keyword, type: 'json' });
+  if (!data || data.code !== 200 || !data.data) return null;
+  const reg = data.data.registration_info || {};
+  const tech = data.data.technical_info || {};
+  const icp = data.data.icp_info || {};
+  return {
+    domain: data.data.domain,
+    creationDate: reg.creation_date,
+    expirationDate: reg.expiration_date,
+    updateDate: reg.update_date,
+    registrar: reg.registrar,
+    domainStatus: tech.domain_status,
+    nameServers: tech.name_servers,
+    icpCompany: icp.company_name,
+    icpLicense: icp.license,
+    icpType: icp.type,
+    icpProvince: icp.province,
+  };
+}
+
+// ============= 19. 网站备案查询 =============
+export interface IcpRecord {
+  domain: string;
+  unitName: string;
+  natureName: string;
+  serviceLicence: string;
+  updateTime: string;
+}
+
+export interface IcpResult {
+  total: number;
+  records: IcpRecord[];
+}
+
+export async function queryIcp(web: string): Promise<IcpResult | null> {
+  const data: any = await tminiGet('domain', { web });
+  if (!data || data.code !== 200) return null;
+  return {
+    total: data.total || 0,
+    records: (data.data || []).map((r: any) => ({
+      domain: r.domain,
+      unitName: r.unitName,
+      natureName: r.natureName,
+      serviceLicence: r.serviceLicence,
+      updateTime: r.updateTime,
+    })),
+  };
+}
+
+// ============= 20. 易车汽车查询 =============
+export interface CarModel {
+  id: number;
+  name: string;
+  brand: string;
+  price: string;
+  level: string;
+  logo: string;
+  isNewEnergy: number;
+  saleStatus: number;
+  priceMin?: string;
+  priceMax?: string;
+  image?: string;
+}
+
+export interface CarResult {
+  list: CarModel[];
+}
+
+export async function queryCar(keyword: string): Promise<CarResult | null> {
+  const data: any = await tminiGet('car', { keyword });
+  if (!data || data.status !== '1' || !Array.isArray(data.data)) return null;
+  return {
+    list: data.data.map((c: any) => ({
+      id: c.id,
+      name: c.name,
+      brand: c.brand,
+      price: c.price,
+      level: c.level,
+      logo: c.logo,
+      isNewEnergy: c.isNewEnergy,
+      saleStatus: c.saleStatus,
+      priceMin: c.priceRange?.min,
+      priceMax: c.priceRange?.max,
+      image: c.image,
+    })),
+  };
+}
+
+// ============= 21. 12306 候车室大屏 =============
+export interface TrainSchedule {
+  trainNo: string;
+  fromStation: string;
+  toStation: string;
+  departTime: string;
+  waitingRoom: string;
+  status: string;
+}
+
+export interface TrainStationResult {
+  station: string;
+  page: number;
+  totalPages: number;
+  totalTrains: number;
+  schedules: TrainSchedule[];
+}
+
+export async function queryTrainBoard(city: string): Promise<TrainStationResult | null> {
+  const data: any = await tminiGet('12306', { msg: city, encoding: 'json' });
+  if (!data || !data.车站) return null;
+  return {
+    station: data.车站,
+    page: data.当前页码 || 1,
+    totalPages: data.总页数 || 1,
+    totalTrains: data.总车次 || 0,
+    schedules: (data.当前页车次列表 || []).map((s: any) => ({
+      trainNo: s.车次号,
+      fromStation: s.出发地,
+      toStation: s.目的地,
+      departTime: s.出发时间,
+      waitingRoom: s['候车室/检票口'],
+      status: s.状态,
+    })),
+  };
+}
+
+// ============= 22. 余票查询 =============
+export interface TrainTicket {
+  trainNo: string;
+  fromStation: string;
+  toStation: string;
+  departTime: string;
+  arriveTime: string;
+  duration: string;
+  businessSeat?: string;
+  firstSeat?: string;
+  secondSeat?: string;
+  hardSleeper?: string;
+  softSleeper?: string;
+  hardSeat?: string;
+  softSeat?: string;
+  noSeat?: string;
+}
+
+export interface TicketResult {
+  tickets: TrainTicket[];
+  raw?: any;
+}
+
+export async function queryTickets(a: string, b: string, time?: string): Promise<TicketResult | null> {
+  const params: any = { a, b };
+  if (time) params.time = time;
+  const data: any = await tminiGet('ticket', params);
+  if (!data) return null;
+  // 这个接口返回结构复杂（12306 原始数据），做最简封装
+  const list: TrainTicket[] = [];
+  const trainList = data?.data?.data || data?.data?.list || [];
+  if (Array.isArray(trainList)) {
+    for (const t of trainList) {
+      list.push({
+        trainNo: t.station_train_code || t.train_no || '',
+        fromStation: t.from_station_name || t.start_station_name || '',
+        toStation: t.to_station_name || t.end_station_name || '',
+        departTime: t.start_time || '',
+        arriveTime: t.arrive_time || '',
+        duration: t.lishi || t.run_time || '',
+        businessSeat: t.swz_num,
+        firstSeat: t.ydz_num,
+        secondSeat: t.edz_num,
+        hardSleeper: t.yw_num,
+        softSleeper: t.rw_num,
+        hardSeat: t.yz_num,
+        softSeat: t.rz_num,
+        noSeat: t.wz_num,
+      });
+    }
+  }
+  return { tickets: list, raw: data };
+}
+
+// ============= 23. 全网热搜榜 =============
+export interface HotItem {
+  text: string;
+  url?: string;
+  hot?: string;
+  image?: string;
+  desc?: string;
+  groupId?: string;
+}
+
+export interface HotBoardResult {
+  title: string;
+  items: HotItem[];
+}
+
+export const HOT_BOARD_TYPES: Record<string, string> = {
+  '000': '抖音热搜', '111': '微博热搜', '222': '全网热搜', '333': '大众点评',
+  '444': '资讯新闻', '555': 'QQ音乐', '666': '多看小说', '777': '女频小说',
+  '888': '小游戏', '999': '知乎',
+};
+
+export async function queryHotBoard(type: string = '111'): Promise<HotBoardResult | null> {
+  const data: any = await tminiGet('Collection', { type });
+  if (!data || data.code !== 200 || !data.data) return null;
+  return {
+    title: data.data.title,
+    items: (data.data.data || []).map((d: any) => ({
+      text: d.text,
+      url: d.h5_url,
+      hot: d.right_label,
+      image: d.img_url,
+      desc: d.abstract_info,
+      groupId: d.group_id,
+    })),
+  };
+}
+
+// ============= 24. 历史上的今天 =============
+export interface HistoryEvent {
+  title: string;
+  year: string;
+  desc: string;
+  link: string;
+}
+
+export interface HistoryTodayResult {
+  date: string;
+  events: HistoryEvent[];
+}
+
+export async function queryHistoryToday(): Promise<HistoryTodayResult | null> {
+  const data: any = await tminiGet('today', { type: 'json' });
+  if (!data || data.code !== 200) return null;
+  return {
+    date: data.date,
+    events: (data.events || []).map((e: any) => ({
+      title: e.title,
+      year: e.year,
+      desc: e.desc,
+      link: e.link,
+    })),
+  };
+}
+
+// ============= 25. 冷笑话 =============
+export async function queryDadJoke(): Promise<string | null> {
+  const data: any = await tminiGet('dad-joke', {});
+  if (!data || !data.success) return null;
+  return data.quote || null;
+}
+
+// ============= 26. 搞笑段子 =============
+export async function queryDuanzi(): Promise<string | null> {
+  const data: any = await tminiGet('duanzi', {});
+  if (!data || !data.success) return null;
+  return data.quote || null;
+}
+
+// ============= 27. KFC 疯狂星期四 =============
+export async function queryKFC(): Promise<string | null> {
+  const data: any = await tminiGet('kfc', {});
+  if (!data || !data.success) return null;
+  return data.quote || null;
+}
+
+// ============= 28. 怼人语录 =============
+export async function queryDuiren(): Promise<string | null> {
+  const data: any = await tminiGet('mmp', {});
+  if (!data || !data.success) return null;
+  return data.quote || null;
+}
+
+// ============= 29. 黄金价格 =============
+export interface GoldItem {
+  name: string;
+  sellPrice: string;
+  todayPrice?: string;
+  highPrice?: string;
+  lowPrice?: string;
+  unit: string;
+  updated: string;
+}
+
+export interface GoldResult {
+  date: string;
+  metals: GoldItem[];
+  brands: Array<{ brand: string; product: string; price: string; formatted: string }>;
+  banks: Array<{ bank: string; product: string; price: string; formatted: string }>;
+  recycle: Array<{ type: string; price: string; formatted: string; purity?: string }>;
+}
+
+export async function queryGoldPrice(): Promise<GoldResult | null> {
+  const data: any = await tminiGet('gold-price', { type: 'json' });
+  if (!data) return null;
+  return {
+    date: data.date,
+    metals: (data.metals || []).map((m: any) => ({
+      name: m.name,
+      sellPrice: m.sell_price,
+      todayPrice: m.today_price,
+      highPrice: m.high_price,
+      lowPrice: m.low_price,
+      unit: m.unit,
+      updated: m.updated,
+    })),
+    brands: data.stores || [],
+    banks: data.banks || [],
+    recycle: data.recycle || [],
+  };
+}
+
+// ============= 30. 地震记录 =============
+export interface Earthquake {
+  id: number;
+  eventId: number;
+  magnitude: number;
+  depth: number;
+  longitude: number;
+  latitude: number;
+  epicenter: string;
+  signature: string;
+  startAt: number;
+  updateAt: number;
+}
+
+export async function queryEarthquakes(): Promise<Earthquake[] | null> {
+  const data: any = await tminiGet('earthquakerecords', { format: 'json' });
+  if (!data || data.code !== 200) return null;
+  const list = data.data?.data || data.data || [];
+  if (!Array.isArray(list)) return null;
+  return list.map((e: any) => ({
+    id: e.id,
+    eventId: e.eventId,
+    magnitude: e.magnitude,
+    depth: e.depth,
+    longitude: e.longitude,
+    latitude: e.latitude,
+    epicenter: e.epicenter,
+    signature: e.signature,
+    startAt: e.startAt,
+    updateAt: e.updateAt,
+  }));
 }

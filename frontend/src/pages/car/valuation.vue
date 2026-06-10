@@ -3,456 +3,134 @@
     <view class="header">
       <view :style="{ height: statusBarHeight + 'px' }" />
       <view class="header-content">
-        <view class="header-icon">💰</view>
-        <text class="header-title">车辆估值</text>
-        <text class="header-desc">二手车估值 残值分析</text>
+        <view class="header-icon">🚗</view>
+        <text class="header-title">汽车估值</text>
+        <text class="header-desc">输入车型查询指导价/成交价</text>
       </view>
     </view>
 
-    <view class="form-card">
-      <view class="input-row">
-        <text class="input-label">品牌车型</text>
-        <input
-          v-model="model"
-          class="form-input"
-          placeholder="如 奥迪A6L 2020款"
-          placeholder-class="placeholder"
-        />
-      </view>
-      <view class="input-row">
-        <text class="input-label">上牌时间</text>
-        <picker mode="date" :value="regDate" @change="onDateChange">
-          <view class="picker-value">{{ regDate || '请选择' }}</view>
-        </picker>
-      </view>
-      <view class="input-row">
-        <text class="input-label">行驶里程</text>
-        <input
-          v-model="mileage"
-          class="form-input"
-          placeholder="单位：万公里"
-          placeholder-class="placeholder"
-          type="digit"
-        />
-      </view>
-      <view class="input-row">
-        <text class="input-label">车辆颜色</text>
-        <view class="color-list">
-          <view
-            v-for="c in colors"
-            :key="c"
-            class="color-dot"
-            :class="{ active: color === c }"
-            @tap="color = c"
-          >
-            <text class="cd-text">{{ c }}</text>
-          </view>
-        </view>
-      </view>
-      <view class="form-tip">基于大数据分析，估值仅供参考</view>
-      <view class="query-btn" :class="{ disabled: !canQuery }" @tap="onQuery">
-        <text class="query-btn-text">立即估值</text>
+    <view class="search-bar">
+      <view class="search-input-wrap">
+        <text class="search-icon">🔍</text>
+        <input v-model="keyword" class="search-input" placeholder="输入车型关键词（如 凯迪拉克）" placeholder-class="placeholder" />
+        <text class="search-btn" @tap="onSearch">查询</text>
       </view>
     </view>
 
-    <view v-if="result" class="result-card">
-      <view class="result-header">
-        <text class="r-label">估值结果</text>
-        <text class="r-update">更新于 2024-12-01</text>
-      </view>
-      <view class="price-display">
-        <text class="price-num">¥{{ result.price }}</text>
-        <text class="price-unit">万</text>
-        <text class="price-range">估值范围 ¥{{ result.min }} - ¥{{ result.max }} 万</text>
-      </view>
-      <view class="trend">
-        <text class="trend-label">近一年价格趋势</text>
-        <view class="trend-bar">
-          <view
-            v-for="(t, i) in result.trend"
-            :key="i"
-            class="trend-item"
-          >
-            <view class="trend-fill" :style="{ height: t + '%' }" />
-            <text class="trend-month">{{ ['1', '2', '3', '4', '5', '6', '7', '8', '9', '10', '11', '12'][i] }}月</text>
-          </view>
-        </view>
-      </view>
+    <view v-if="loading" class="loading-card">
+      <text class="loading-text">🔄 正在查询车型...</text>
+    </view>
 
-      <view class="factor-list">
-        <text class="section-title">估值因素</text>
-        <view
-          v-for="f in result.factors"
-          :key="f.name"
-          class="factor-row"
-        >
-          <text class="factor-name">{{ f.name }}</text>
-          <view class="factor-bar">
-            <view class="factor-fill" :style="{ width: f.percent + '%', background: f.color }" />
+    <view v-if="error" class="error-card">
+      <text class="error-icon">⚠️</text>
+      <text class="error-text">{{ error }}</text>
+    </view>
+
+    <view v-if="!loading && !error && cars.length" class="content">
+      <text class="result-count">共找到 {{ cars.length }} 款车型</text>
+      <view class="car-list">
+        <view v-for="c in cars" :key="c.id" class="car-item">
+          <view class="car-top">
+            <view class="brand">
+              <image v-if="c.logo" :src="c.logo" class="brand-logo" mode="aspectFit" />
+              <text class="brand-text">{{ c.brand }}</text>
+            </view>
+            <text class="car-level">{{ c.level }}</text>
           </view>
-          <text class="factor-percent">{{ f.percent }}%</text>
+          <view class="car-name">{{ c.name }}</view>
+          <view class="car-prices">
+            <view v-if="c.price" class="price-block">
+              <text class="pb-label">指导价</text>
+              <text class="pb-value">¥{{ c.price }}万</text>
+            </view>
+            <view v-if="c.priceMin || c.priceMax" class="price-block highlight">
+              <text class="pb-label">成交价区间</text>
+              <text class="pb-value">¥{{ c.priceMin || '?' }} - {{ c.priceMax || '?' }}万</text>
+            </view>
+          </view>
+          <view v-if="c.isNewEnergy" class="tag tag-new">新能源</view>
         </view>
       </view>
+    </view>
+
+    <view v-if="!loading && !error && searched && cars.length === 0" class="empty">
+      <text class="empty-icon">🔍</text>
+      <text class="empty-text">未找到相关车型</text>
     </view>
   </view>
 </template>
 
 <script setup lang="ts">
-import { ref, computed } from 'vue';
+import { ref } from 'vue';
+import { queryCar, type CarModel } from '@/api/free-apis';
 
-const statusBarHeight = ref(44);
-const sysInfo = uni.getSystemInfoSync();
-statusBarHeight.value = sysInfo.statusBarHeight || 44;
+const statusBarHeight = ref(uni.getSystemInfoSync().statusBarHeight || 44);
+const keyword = ref('');
+const loading = ref(false);
+const error = ref('');
+const cars = ref<CarModel[]>([]);
+const searched = ref(false);
 
-const model = ref('');
-const regDate = ref('');
-const mileage = ref('');
-const color = ref('');
-
-const colors = ['黑', '白', '银', '灰', '红', '蓝'];
-
-const result = ref<any>(null);
-
-const canQuery = computed(() => model.value && regDate.value && mileage.value);
-
-function onDateChange(e: any) {
-  regDate.value = e.detail.value;
-}
-
-function onQuery() {
-  if (!canQuery.value) {
-    uni.showToast({ title: '请填写完整信息', icon: 'none' });
+const onSearch = async () => {
+  const kw = keyword.value.trim();
+  if (!kw) {
+    uni.showToast({ title: '请输入车型关键词', icon: 'none' });
     return;
   }
-  const m = parseFloat(mileage.value) || 5;
-  // 模拟估值
-  const base = 35;
-  const ageFactor = Math.max(0.5, 1 - (new Date().getFullYear() - new Date(regDate.value).getFullYear()) * 0.08);
-  const kmFactor = Math.max(0.7, 1 - m * 0.04);
-  const price = (base * ageFactor * kmFactor).toFixed(2);
-  const min = (parseFloat(price) * 0.92).toFixed(2);
-  const max = (parseFloat(price) * 1.08).toFixed(2);
-
-  result.value = {
-    price,
-    min,
-    max,
-    trend: [80, 78, 76, 75, 74, 72, 70, 68, 66, 64, 62, 60],
-    factors: [
-      { name: '车况评分', percent: 85, color: '#07C160' },
-      { name: '行驶里程', percent: Math.round(kmFactor * 100), color: '#1A6CFF' },
-      { name: '上牌年限', percent: Math.round(ageFactor * 100), color: '#FF9800' },
-      { name: '市场热度', percent: 75, color: '#E91E63' },
-      { name: '地域因素', percent: 80, color: '#9C27B0' },
-    ],
-  };
-}
+  loading.value = true;
+  error.value = '';
+  cars.value = [];
+  searched.value = true;
+  try {
+    const r = await queryCar(kw);
+    if (!r) error.value = '查询失败，请稍后重试';
+    else cars.value = r.list;
+  } catch (e) {
+    error.value = '查询异常';
+  } finally {
+    loading.value = false;
+  }
+};
 </script>
 
 <style lang="scss" scoped>
 @import '@/styles/variables.scss';
-
-.page {
-  background: $bg-page;
-  min-height: 100vh;
-  padding-bottom: 40rpx;
-}
-
-.header {
-  background: linear-gradient(180deg, #5C6BC0 0%, #283593 100%);
-}
-
-.header-content {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  padding: 24rpx 0 40rpx;
-}
-
-.header-icon {
-  width: 96rpx;
-  height: 96rpx;
-  border-radius: 24rpx;
-  background: rgba(255, 255, 255, 0.2);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 48rpx;
-  margin-bottom: 12rpx;
-}
-
-.header-title {
-  font-size: 38rpx;
-  font-weight: 700;
-  color: #fff;
-  margin-bottom: 6rpx;
-}
-
-.header-desc {
-  font-size: 24rpx;
-  color: rgba(255, 255, 255, 0.85);
-}
-
-/* 表单 */
-.form-card {
-  margin: -28rpx 24rpx 0;
-  background: $bg-card;
-  border-radius: $radius-lg;
-  padding: 24rpx 28rpx;
-  position: relative;
-  z-index: 10;
-  box-shadow: 0 4rpx 16rpx rgba(0, 0, 0, 0.06);
-}
-
-.input-row {
-  display: flex;
-  align-items: center;
-  background: $bg-grey;
-  border-radius: $radius-md;
-  height: 88rpx;
-  padding: 0 20rpx;
-  margin-bottom: 12rpx;
-}
-
-.input-label {
-  font-size: 26rpx;
-  color: $text-tertiary;
-  width: 160rpx;
-  flex-shrink: 0;
-}
-
-.form-input {
-  flex: 1;
-  height: 88rpx;
-  font-size: 28rpx;
-  color: $text-primary;
-}
-
-.placeholder {
-  color: $text-tertiary;
-}
-
-.picker-value {
-  flex: 1;
-  height: 88rpx;
-  display: flex;
-  align-items: center;
-  font-size: 28rpx;
-  color: $text-primary;
-}
-
-.color-list {
-  flex: 1;
-  display: flex;
-  gap: 12rpx;
-  flex-wrap: wrap;
-}
-
-.color-dot {
-  width: 64rpx;
-  height: 64rpx;
-  background: $bg-card;
-  border-radius: 50%;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  border: 2rpx solid transparent;
-}
-
-.color-dot.active {
-  border-color: $primary;
-  background: rgba(7, 193, 96, 0.1);
-}
-
-.cd-text {
-  font-size: 24rpx;
-  color: $text-primary;
-  font-weight: 500;
-}
-
-.form-tip {
-  display: block;
-  font-size: 22rpx;
-  color: $text-tertiary;
-  margin-top: 12rpx;
-  text-align: center;
-}
-
-.query-btn {
-  margin-top: 24rpx;
-  height: 88rpx;
-  background: $info;
-  border-radius: 999rpx;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  box-shadow: 0 8rpx 24rpx rgba(26, 108, 255, 0.3);
-}
-
-.query-btn.disabled {
-  background: $text-placeholder;
-  box-shadow: none;
-}
-
-.query-btn-text {
-  font-size: 32rpx;
-  color: #fff;
-  font-weight: 600;
-}
-
-/* 结果 */
-.result-card {
-  margin: 24rpx;
-  background: $bg-card;
-  border-radius: $radius-lg;
-  padding: 24rpx 28rpx;
-  box-shadow: 0 2rpx 8rpx rgba(0, 0, 0, 0.03);
-}
-
-.result-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 16rpx;
-}
-
-.r-label {
-  font-size: 28rpx;
-  font-weight: 700;
-  color: $text-primary;
-}
-
-.r-update {
-  font-size: 22rpx;
-  color: $text-tertiary;
-}
-
-.price-display {
-  display: flex;
-  align-items: baseline;
-  justify-content: center;
-  padding: 24rpx 0;
-  background: linear-gradient(135deg, #E3F2FD, #BBDEFB);
-  border-radius: $radius-md;
-  margin-bottom: 20rpx;
-}
-
-.price-num {
-  font-size: 64rpx;
-  font-weight: 800;
-  color: $info;
-  font-family: monospace;
-  letter-spacing: 2rpx;
-}
-
-.price-unit {
-  font-size: 28rpx;
-  font-weight: 600;
-  color: $info;
-  margin-left: 4rpx;
-  margin-right: 12rpx;
-}
-
-.price-range {
-  font-size: 24rpx;
-  color: $text-secondary;
-}
-
-/* 趋势 */
-.trend {
-  margin-bottom: 20rpx;
-}
-
-.trend-label {
-  display: block;
-  font-size: 26rpx;
-  font-weight: 600;
-  color: $text-primary;
-  margin-bottom: 12rpx;
-}
-
-.trend-bar {
-  display: flex;
-  align-items: flex-end;
-  height: 120rpx;
-  gap: 4rpx;
-  background: $bg-grey;
-  border-radius: $radius-md;
-  padding: 8rpx;
-}
-
-.trend-item {
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  height: 100%;
-  justify-content: flex-end;
-}
-
-.trend-fill {
-  width: 100%;
-  background: linear-gradient(180deg, $info, #0D47A1);
-  border-radius: 4rpx 4rpx 0 0;
-  min-height: 4rpx;
-}
-
-.trend-month {
-  font-size: 16rpx;
-  color: $text-tertiary;
-  margin-top: 4rpx;
-}
-
-/* 因素 */
-.factor-list {
-  padding-top: 8rpx;
-}
-
-.section-title {
-  display: block;
-  font-size: 28rpx;
-  font-weight: 700;
-  color: $text-primary;
-  margin-bottom: 12rpx;
-  padding-left: 8rpx;
-  border-left: 6rpx solid $info;
-  line-height: 1;
-}
-
-.factor-row {
-  display: flex;
-  align-items: center;
-  padding: 12rpx 0;
-  gap: 16rpx;
-}
-
-.factor-name {
-  font-size: 26rpx;
-  color: $text-primary;
-  width: 160rpx;
-  flex-shrink: 0;
-}
-
-.factor-bar {
-  flex: 1;
-  height: 12rpx;
-  background: $bg-grey;
-  border-radius: 6rpx;
-  overflow: hidden;
-}
-
-.factor-fill {
-  height: 100%;
-  border-radius: 6rpx;
-  transition: width 0.3s;
-}
-
-.factor-percent {
-  font-size: 26rpx;
-  color: $text-primary;
-  font-weight: 600;
-  width: 80rpx;
-  text-align: right;
-  flex-shrink: 0;
-}
+.page { min-height: 100vh; background: $bg-page; padding-bottom: 40rpx; }
+.header { background: linear-gradient(135deg, #1976D2, #42A5F5); padding: 30rpx 40rpx 80rpx; }
+.header-content { display: flex; flex-direction: column; align-items: center; }
+.header-icon { font-size: 80rpx; margin-bottom: 16rpx; }
+.header-title { font-size: 40rpx; font-weight: 700; color: #fff; }
+.header-desc { font-size: 24rpx; color: rgba(255,255,255,0.85); margin-top: 8rpx; }
+.search-bar { margin: -40rpx 24rpx 0; }
+.search-input-wrap { background: #fff; border-radius: 50rpx; padding: 8rpx 12rpx 8rpx 30rpx; display: flex; align-items: center; box-shadow: 0 6rpx 20rpx rgba(0,0,0,0.08); }
+.search-icon { font-size: 28rpx; color: $text-tertiary; margin-right: 12rpx; }
+.search-input { flex: 1; height: 70rpx; font-size: 28rpx; }
+.placeholder { color: $text-tertiary; }
+.search-btn { background: linear-gradient(135deg, #1976D2, #42A5F5); color: #fff; font-size: 26rpx; padding: 16rpx 30rpx; border-radius: 40rpx; }
+.loading-card { margin: 30rpx 24rpx; background: #fff; border-radius: 20rpx; padding: 60rpx 30rpx; text-align: center; }
+.loading-text { font-size: 28rpx; color: $text-secondary; }
+.error-card { margin: 30rpx 24rpx; background: #FFF3E0; border-radius: 20rpx; padding: 30rpx; display: flex; align-items: center; }
+.error-icon { font-size: 36rpx; margin-right: 16rpx; }
+.error-text { font-size: 26rpx; color: $warning; flex: 1; }
+.content { padding: 30rpx 24rpx 0; }
+.result-count { display: block; font-size: 24rpx; color: $text-tertiary; margin-bottom: 16rpx; }
+.car-list { display: flex; flex-direction: column; gap: 16rpx; }
+.car-item { background: #fff; border-radius: 20rpx; padding: 24rpx; position: relative; }
+.car-top { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8rpx; }
+.brand { display: flex; align-items: center; gap: 8rpx; }
+.brand-logo { width: 36rpx; height: 36rpx; border-radius: 8rpx; background: $bg-page; }
+.brand-text { font-size: 24rpx; color: $text-secondary; font-weight: 600; }
+.car-level { font-size: 22rpx; color: $info; background: rgba(26,108,255,0.1); padding: 4rpx 12rpx; border-radius: 10rpx; }
+.car-name { display: block; font-size: 32rpx; color: $text-primary; font-weight: 700; margin-bottom: 16rpx; }
+.car-prices { display: flex; flex-direction: column; gap: 8rpx; }
+.price-block { display: flex; justify-content: space-between; align-items: center; padding: 12rpx 16rpx; background: $bg-page; border-radius: 10rpx; }
+.price-block.highlight { background: linear-gradient(135deg, rgba(255,107,53,0.08), rgba(255,107,53,0.04)); }
+.pb-label { font-size: 24rpx; color: $text-secondary; }
+.pb-value { font-size: 28rpx; color: $text-primary; font-weight: 700; }
+.price-block.highlight .pb-value { color: #FF6B35; }
+.tag { position: absolute; top: 24rpx; right: 24rpx; padding: 4rpx 12rpx; border-radius: 10rpx; font-size: 20rpx; font-weight: 600; }
+.tag-new { background: rgba(7,193,96,0.12); color: $primary; }
+.empty { text-align: center; padding: 100rpx 0; display: flex; flex-direction: column; align-items: center; }
+.empty-icon { font-size: 80rpx; opacity: 0.4; }
+.empty-text { font-size: 26rpx; color: $text-tertiary; margin-top: 20rpx; }
 </style>

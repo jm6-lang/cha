@@ -3,40 +3,78 @@
     <view class="header">
       <view :style="{ height: statusBarHeight + 'px' }" />
       <view class="header-content">
-        <view class="header-icon">📚</view>
-        <text class="header-title">金融知识</text>
-        <text class="header-desc">信用贷款 理财投资 风险防范</text>
+        <view class="header-icon">💰</view>
+        <text class="header-title">金融资讯</text>
+        <text class="header-desc">黄金 · 银行金条 · 品牌金价</text>
       </view>
     </view>
 
-    <view class="category-bar">
-      <view
-        v-for="c in categories"
-        :key="c.key"
-        class="cat-item"
-        :class="{ active: activeCat === c.key }"
-        @tap="activeCat = c.key"
-      >
-        <text class="cat-text">{{ c.name }}</text>
-      </view>
+    <view v-if="loading" class="loading-card">
+      <text class="loading-text">🔄 正在获取最新金价...</text>
     </view>
 
-    <view class="article-list">
-      <view
-        v-for="a in filteredArticles"
-        :key="a.id"
-        class="article-item"
-        @tap="onArticleTap(a)"
-      >
-        <view class="article-icon" :style="{ background: a.color }">
-          <text class="ai-text">{{ a.icon }}</text>
+    <view v-if="error" class="error-card">
+      <text class="error-icon">⚠️</text>
+      <text class="error-text">{{ error }}</text>
+    </view>
+
+    <view v-if="!loading && !error && result" class="content">
+      <view class="date-block">
+        <text class="date-text">📅 {{ result.date }} 报价</text>
+        <text class="date-refresh" @tap="onRefresh">🔄 刷新</text>
+      </view>
+
+      <!-- 黄金现货 -->
+      <view class="section">
+        <text class="section-title">📈 贵金属行情</text>
+        <view class="metals-list">
+          <view v-for="m in result.metals" :key="m.name" class="metal-item">
+            <text class="m-name">{{ m.name }}</text>
+            <view class="m-prices">
+              <text class="m-price">¥{{ m.sellPrice }}</text>
+              <text class="m-unit">/{{ m.unit }}</text>
+            </view>
+            <view v-if="m.highPrice && m.lowPrice" class="m-range">
+              <text class="mr-item mr-low">低 {{ m.lowPrice }}</text>
+              <text class="mr-item mr-high">高 {{ m.highPrice }}</text>
+            </view>
+          </view>
         </view>
-        <view class="article-info">
-          <text class="a-title">{{ a.title }}</text>
-          <text class="a-desc">{{ a.desc }}</text>
-          <view class="a-meta">
-            <text class="a-views">{{ a.views }} 阅读</text>
-            <text class="a-time">{{ a.time }}</text>
+      </view>
+
+      <!-- 品牌金价 -->
+      <view v-if="result.brands.length" class="section">
+        <text class="section-title">💍 品牌金店</text>
+        <view class="brand-list">
+          <view v-for="(b, i) in result.brands" :key="i" class="brand-item">
+            <text class="b-name">{{ b.brand }}</text>
+            <text class="b-price">{{ b.formatted || b.price + '元/克' }}</text>
+          </view>
+        </view>
+      </view>
+
+      <!-- 银行金条 -->
+      <view v-if="result.banks.length" class="section">
+        <text class="section-title">🏦 银行金条</text>
+        <view class="bank-list">
+          <view v-for="(b, i) in result.banks" :key="i" class="bank-item">
+            <text class="b-name">{{ b.bank }}</text>
+            <text class="b-product">{{ b.product }}</text>
+            <text class="b-price">{{ b.formatted || b.price + '元/克' }}</text>
+          </view>
+        </view>
+      </view>
+
+      <!-- 黄金回收 -->
+      <view v-if="result.recycle.length" class="section">
+        <text class="section-title">♻️ 黄金回收</text>
+        <view class="recycle-list">
+          <view v-for="(r, i) in result.recycle" :key="i" class="recycle-item">
+            <view class="r-left">
+              <text class="r-type">{{ r.type }}</text>
+              <text v-if="r.purity" class="r-purity">纯度: {{ r.purity }}</text>
+            </view>
+            <text class="r-price">{{ r.formatted || r.price + '元/克' }}</text>
           </view>
         </view>
       </view>
@@ -45,190 +83,70 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed } from 'vue';
+import { ref } from 'vue';
+import { queryGoldPrice, type GoldResult } from '@/api/free-apis';
 
-const statusBarHeight = ref(44);
-const sysInfo = uni.getSystemInfoSync();
-statusBarHeight.value = sysInfo.statusBarHeight || 44;
+const statusBarHeight = ref(uni.getSystemInfoSync().statusBarHeight || 44);
+const loading = ref(false);
+const error = ref('');
+const result = ref<GoldResult | null>(null);
 
-const activeCat = ref('all');
+const loadData = async () => {
+  loading.value = true;
+  error.value = '';
+  try {
+    const r = await queryGoldPrice();
+    if (!r) error.value = '获取金价失败，请稍后重试';
+    else result.value = r;
+  } catch (e) {
+    error.value = '加载异常';
+  } finally {
+    loading.value = false;
+  }
+};
 
-const categories = [
-  { key: 'all', name: '全部' },
-  { key: 'credit', name: '征信知识' },
-  { key: 'loan', name: '贷款知识' },
-  { key: 'invest', name: '投资理财' },
-  { key: 'risk', name: '风险防范' },
-];
+const onRefresh = () => loadData();
 
-const articles = ref([
-  { id: 1, cat: 'credit', icon: '💳', color: '#E3F2FD', title: '什么是个人征信？', desc: '个人征信是您的"经济身份证"，记录您的信用历史和还款能力。', views: '12.5万', time: '2天前' },
-  { id: 2, cat: 'loan', icon: '💰', color: '#FFF3E0', title: '如何选择适合自己的贷款？', desc: '从利率、期限、还款方式三个维度分析，教你选到最适合的贷款产品。', views: '8.3万', time: '5天前' },
-  { id: 3, cat: 'invest', icon: '📈', color: '#E8F5E9', title: '理财入门：从余额宝开始', desc: '低风险理财的入门指南，新手也能轻松学会的理财方法。', views: '15.2万', time: '1周前' },
-  { id: 4, cat: 'risk', icon: '🛡️', color: '#FCE4EC', title: '如何识别和防范网贷诈骗？', desc: '揭秘常见网贷诈骗手段，保护自己的财产安全和征信记录。', views: '20.1万', time: '1周前' },
-  { id: 5, cat: 'credit', icon: '📊', color: '#F3E5F5', title: '征信花了怎么办？', desc: '征信查询过多、负债过高都会"花"，修复方法看这里。', views: '9.6万', time: '2周前' },
-  { id: 6, cat: 'loan', icon: '🏠', color: '#E0F7FA', title: '房贷利率怎么算？', desc: '详细解读 LPR、加点、还款方式等房贷核心概念。', views: '11.3万', time: '2周前' },
-  { id: 7, cat: 'invest', icon: '💎', color: '#FFF8E1', title: '基金定投的正确姿势', desc: '基金定投的时机选择、品种搭配和止盈策略详解。', views: '7.8万', time: '3周前' },
-  { id: 8, cat: 'risk', icon: '⚠️', color: '#FFE0B2', title: '银行卡盗刷怎么办？', desc: '第一时间该做什么？保留哪些证据？如何申请赔付？', views: '13.4万', time: '3周前' },
-]);
-
-const filteredArticles = computed(() => {
-  if (activeCat.value === 'all') return articles.value;
-  return articles.value.filter(a => a.cat === activeCat.value);
-});
-
-function onArticleTap(a: any) {
-  uni.showToast({ title: `查看：${a.title}`, icon: 'none' });
-}
+loadData();
 </script>
 
 <style lang="scss" scoped>
 @import '@/styles/variables.scss';
-
-.page {
-  background: $bg-page;
-  min-height: 100vh;
-  padding-bottom: 40rpx;
-}
-
-.header {
-  background: linear-gradient(180deg, #5C6BC0 0%, #283593 100%);
-}
-
-.header-content {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  padding: 24rpx 0 40rpx;
-}
-
-.header-icon {
-  width: 96rpx;
-  height: 96rpx;
-  border-radius: 24rpx;
-  background: rgba(255, 255, 255, 0.2);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 48rpx;
-  margin-bottom: 12rpx;
-}
-
-.header-title {
-  font-size: 38rpx;
-  font-weight: 700;
-  color: #fff;
-  margin-bottom: 6rpx;
-}
-
-.header-desc {
-  font-size: 24rpx;
-  color: rgba(255, 255, 255, 0.85);
-}
-
-/* 分类 */
-.category-bar {
-  display: flex;
-  background: $bg-card;
-  margin: 20rpx 24rpx 0;
-  border-radius: $radius-md;
-  padding: 8rpx;
-  gap: 4rpx;
-  overflow-x: auto;
-}
-
-.cat-item {
-  flex: 1;
-  text-align: center;
-  padding: 16rpx 16rpx;
-  border-radius: $radius-sm;
-  white-space: nowrap;
-}
-
-.cat-item.active {
-  background: $info;
-}
-
-.cat-text {
-  font-size: 24rpx;
-  color: $text-secondary;
-}
-
-.cat-item.active .cat-text {
-  color: #fff;
-  font-weight: 600;
-}
-
-/* 列表 */
-.article-list {
-  margin: 20rpx 24rpx 0;
-  display: flex;
-  flex-direction: column;
-  gap: 12rpx;
-}
-
-.article-item {
-  display: flex;
-  background: $bg-card;
-  border-radius: $radius-lg;
-  padding: 24rpx;
-  box-shadow: 0 2rpx 8rpx rgba(0, 0, 0, 0.03);
-}
-
-.article-icon {
-  width: 96rpx;
-  height: 96rpx;
-  border-radius: 24rpx;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  margin-right: 20rpx;
-  flex-shrink: 0;
-}
-
-.ai-text {
-  font-size: 48rpx;
-}
-
-.article-info {
-  flex: 1;
-  min-width: 0;
-}
-
-.a-title {
-  display: block;
-  font-size: 30rpx;
-  font-weight: 700;
-  color: $text-primary;
-  margin-bottom: 6rpx;
-}
-
-.a-desc {
-  display: block;
-  font-size: 24rpx;
-  color: $text-tertiary;
-  line-height: 1.5;
-  margin-bottom: 8rpx;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  display: -webkit-box;
-  -webkit-line-clamp: 2;
-  -webkit-box-orient: vertical;
-}
-
-.a-meta {
-  display: flex;
-  align-items: center;
-  gap: 12rpx;
-}
-
-.a-views {
-  font-size: 20rpx;
-  color: $text-tertiary;
-}
-
-.a-time {
-  font-size: 20rpx;
-  color: $text-tertiary;
-}
+.page { min-height: 100vh; background: $bg-page; padding-bottom: 40rpx; }
+.header { background: linear-gradient(135deg, #D4AF37, #FFD700); padding: 30rpx 40rpx 60rpx; }
+.header-content { display: flex; flex-direction: column; align-items: center; }
+.header-icon { font-size: 80rpx; margin-bottom: 16rpx; }
+.header-title { font-size: 40rpx; font-weight: 700; color: #fff; }
+.header-desc { font-size: 24rpx; color: rgba(255,255,255,0.85); margin-top: 8rpx; }
+.loading-card { margin: 30rpx 24rpx; background: #fff; border-radius: 20rpx; padding: 60rpx 30rpx; text-align: center; }
+.loading-text { font-size: 28rpx; color: $text-secondary; }
+.error-card { margin: 30rpx 24rpx; background: #FFF3E0; border-radius: 20rpx; padding: 30rpx; display: flex; align-items: center; }
+.error-icon { font-size: 36rpx; margin-right: 16rpx; }
+.error-text { font-size: 26rpx; color: $warning; flex: 1; }
+.content { padding: 30rpx 24rpx 0; }
+.date-block { display: flex; align-items: center; justify-content: space-between; margin-bottom: 24rpx; }
+.date-text { font-size: 26rpx; color: $text-secondary; }
+.date-refresh { font-size: 24rpx; color: $info; padding: 8rpx 16rpx; background: rgba(26,108,255,0.08); border-radius: 20rpx; }
+.section { background: #fff; border-radius: 20rpx; padding: 24rpx; margin-bottom: 24rpx; }
+.section-title { display: block; font-size: 30rpx; font-weight: 700; color: $text-primary; margin-bottom: 20rpx; padding-left: 8rpx; border-left: 6rpx solid #D4AF37; line-height: 1; }
+.metals-list { display: flex; flex-direction: column; gap: 16rpx; }
+.metal-item { padding: 20rpx; background: linear-gradient(135deg, #FFF8E1, #FFFEF7); border-radius: 14rpx; }
+.m-name { font-size: 28rpx; color: $text-primary; font-weight: 600; display: block; margin-bottom: 8rpx; }
+.m-prices { display: flex; align-items: baseline; }
+.m-price { font-size: 40rpx; color: #D4AF37; font-weight: 700; }
+.m-unit { font-size: 22rpx; color: $text-tertiary; margin-left: 6rpx; }
+.m-range { display: flex; gap: 20rpx; margin-top: 8rpx; }
+.mr-item { font-size: 22rpx; }
+.mr-low { color: $primary; }
+.mr-high { color: #FF5252; }
+.brand-list, .bank-list, .recycle-list { display: flex; flex-direction: column; gap: 8rpx; }
+.brand-item, .bank-item { display: flex; justify-content: space-between; align-items: center; padding: 18rpx 20rpx; background: $bg-page; border-radius: 12rpx; }
+.b-name { font-size: 28rpx; color: $text-primary; font-weight: 600; }
+.b-product { font-size: 22rpx; color: $text-tertiary; margin: 0 12rpx; flex: 1; }
+.b-price { font-size: 28rpx; color: #D4AF37; font-weight: 700; }
+.recycle-item { display: flex; justify-content: space-between; align-items: center; padding: 18rpx 20rpx; background: $bg-page; border-radius: 12rpx; }
+.r-left { display: flex; flex-direction: column; gap: 4rpx; }
+.r-type { font-size: 28rpx; color: $text-primary; font-weight: 600; }
+.r-purity { font-size: 22rpx; color: $text-tertiary; }
+.r-price { font-size: 28rpx; color: $text-primary; font-weight: 700; }
 </style>
