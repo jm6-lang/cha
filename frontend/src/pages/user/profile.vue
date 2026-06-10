@@ -1,27 +1,97 @@
 <template>
-  <view class="container">
-    <view class="profile-header card">
-      <view class="avatar">{{ user.nickname.charAt(0) }}</view>
-      <view class="info">
-        <text class="name">{{ user.nickname }}</text>
-        <text class="uid">UID: {{ user.userId || '-' }}</text>
+  <view class="page">
+    <!-- 用户头部 -->
+    <view class="user-header">
+      <view class="user-info" @tap="goProfile">
+        <view class="avatar">{{ user.nickname.charAt(0) }}</view>
+        <view class="user-detail">
+          <text class="nickname">{{ user.nickname }}</text>
+          <text class="uid">UID: {{ user.userId || '未登录' }}</text>
+        </view>
+      </view>
+      <view class="header-actions">
+        <view class="header-action" @tap="goHistory">
+          <text class="action-icon">📋</text>
+          <text class="action-label">查询记录</text>
+        </view>
       </view>
     </view>
 
-    <view class="menu card">
-      <view class="menu-item" v-for="(m, i) in menus" :key="i" @tap="onMenu(m)">
-        <text class="menu-icon">{{ m.icon }}</text>
-        <text class="menu-name">{{ m.name }}</text>
-        <text class="menu-arrow">›</text>
+    <!-- 资产卡片 -->
+    <view class="asset-card">
+      <view class="asset-row">
+        <view class="asset-item">
+          <text class="asset-value">{{ user.isLoggedIn ? '0.00' : '-' }}</text>
+          <text class="asset-label">余额(元)</text>
+        </view>
+        <view class="asset-divider" />
+        <view class="asset-item">
+          <text class="asset-value">{{ user.isLoggedIn ? '0' : '-' }}</text>
+          <text class="asset-label">查询次数</text>
+        </view>
+        <view class="asset-divider" />
+        <view class="asset-item">
+          <text class="asset-value">{{ user.isLoggedIn ? '0' : '-' }}</text>
+          <text class="asset-label">优惠券</text>
+        </view>
+      </view>
+      <view class="asset-btns">
+        <view class="asset-btn recharge" @tap="onRecharge">
+          <text class="asset-btn-text">充值</text>
+        </view>
       </view>
     </view>
 
-    <view class="actions">
-      <button v-if="!user.isLoggedIn" class="btn-primary" @tap="user.mockLogin">登录（演示）</button>
+    <!-- VIP卡片 -->
+    <view class="vip-card" @tap="onVip">
+      <view class="vip-left">
+        <text class="vip-icon">👑</text>
+        <view class="vip-info">
+          <text class="vip-title">开通会员</text>
+          <text class="vip-desc">享受更多查询优惠</text>
+        </view>
+      </view>
+      <text class="vip-arrow">立即开通 ›</text>
+    </view>
+
+    <!-- 功能菜单 -->
+    <view class="menu-section">
+      <view class="menu-group">
+        <view class="menu-item" v-for="(m, i) in menuGroup1" :key="'g1-'+i" @tap="onMenu(m)">
+          <view class="menu-left">
+            <view class="menu-icon" :style="{ background: m.bgColor }">{{ m.icon }}</view>
+            <text class="menu-name">{{ m.name }}</text>
+          </view>
+          <view class="menu-right">
+            <text v-if="m.badge" class="menu-badge">{{ m.badge }}</text>
+            <text class="menu-arrow">›</text>
+          </view>
+        </view>
+      </view>
+
+      <view class="menu-group">
+        <view class="menu-item" v-for="(m, i) in menuGroup2" :key="'g2-'+i" @tap="onMenu(m)">
+          <view class="menu-left">
+            <view class="menu-icon" :style="{ background: m.bgColor }">{{ m.icon }}</view>
+            <text class="menu-name">{{ m.name }}</text>
+          </view>
+          <view class="menu-right">
+            <text class="menu-arrow">›</text>
+          </view>
+        </view>
+      </view>
+    </view>
+
+    <!-- 登录/退出 -->
+    <view class="auth-section">
+      <button v-if="!user.isLoggedIn" class="btn-primary" @tap="user.mockLogin">登录 / 注册</button>
       <button v-else class="btn-secondary" @tap="user.logout">退出登录</button>
     </view>
 
-    <view class="brand">数查 (ShuCha) v0.1.0</view>
+    <!-- 版本 -->
+    <view class="version">
+      <text class="version-text">数查 (ShuCha) v0.2.0</text>
+    </view>
   </view>
 </template>
 
@@ -30,19 +100,42 @@ import { useUserStore } from '@/stores/user';
 
 const user = useUserStore();
 
-const menus = [
-  { name: '我的查询', icon: '📋' },
-  { name: '会员中心', icon: '💎' },
-  { name: '钱包', icon: '💰' },
-  { name: '设置', icon: '⚙️' },
-  { name: '关于数查', icon: 'ℹ️' }
+const menuGroup1 = [
+  { name: '我的查询', icon: '📋', bgColor: '#E3F2FD', badge: '', action: 'history' },
+  { name: '我的订单', icon: '📦', bgColor: '#FFF3E0', badge: '', action: '' },
+  { name: '我的钱包', icon: '💰', bgColor: '#E8F5E9', badge: '', action: '' },
+  { name: '我的优惠券', icon: '🎫', bgColor: '#FCE4EC', badge: '2', action: '' },
 ];
 
+const menuGroup2 = [
+  { name: '邀请好友', icon: '🎁', bgColor: '#F3E5F5', badge: '赚佣金', action: '' },
+  { name: '代理中心', icon: '🤝', bgColor: '#E0F7FA', badge: '', action: '' },
+  { name: '意见反馈', icon: '💬', bgColor: '#E8EAF6', badge: '', action: '' },
+  { name: '设置', icon: '⚙️', bgColor: '#F2F3F5', badge: '', action: '' },
+  { name: '关于数查', icon: 'ℹ️', bgColor: '#F1F8E9', badge: '', action: '' },
+];
+
+function goProfile() {
+  // 已在当前页面
+}
+
+function goHistory() {
+  uni.navigateTo({ url: '/pages/hcc/history' });
+}
+
+function onRecharge() {
+  uni.showToast({ title: '充值 - 即将上线', icon: 'none' });
+}
+
+function onVip() {
+  uni.showToast({ title: '会员中心 - 即将上线', icon: 'none' });
+}
+
 function onMenu(m: any) {
-  if (m.name === '我的查询') {
+  if (m.action === 'history') {
     uni.navigateTo({ url: '/pages/hcc/history' });
   } else {
-    uni.showToast({ title: `${m.name} - 待开发`, icon: 'none' });
+    uni.showToast({ title: `${m.name} - 即将上线`, icon: 'none' });
   }
 }
 </script>
@@ -50,88 +143,291 @@ function onMenu(m: any) {
 <style lang="scss" scoped>
 @import '@/styles/variables.scss';
 
-.profile-header {
-  display: flex;
-  align-items: center;
-  padding: 32rpx;
-  margin-bottom: 24rpx;
+.page {
+  background: $bg-page;
+  min-height: 100vh;
 }
 
-.profile-header .avatar {
-  width: 112rpx;
-  height: 112rpx;
-  border-radius: 50%;
+/* 用户头部 */
+.user-header {
   background: $primary;
+  padding: 60rpx 32rpx 32rpx;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.user-info {
+  display: flex;
+  align-items: center;
+}
+
+.avatar {
+  width: 96rpx;
+  height: 96rpx;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.25);
   color: #fff;
-  font-size: 48rpx;
+  font-size: 40rpx;
+  font-weight: 600;
   display: flex;
   align-items: center;
   justify-content: center;
-  margin-right: 24rpx;
+  margin-right: 20rpx;
 }
 
-.profile-header .info {
-  flex: 1;
+.user-detail {
   display: flex;
   flex-direction: column;
 }
 
-.profile-header .name {
-  font-size: 36rpx;
-  font-weight: 500;
-  color: $text-primary;
-  margin-bottom: 8rpx;
+.nickname {
+  font-size: 34rpx;
+  font-weight: 600;
+  color: #fff;
 }
 
-.profile-header .uid {
+.uid {
   font-size: 24rpx;
-  color: $text-tertiary;
+  color: rgba(255, 255, 255, 0.8);
+  margin-top: 4rpx;
 }
 
-.menu {
-  margin-bottom: 32rpx;
+.header-actions {
+  display: flex;
+  gap: 24rpx;
 }
 
-.menu .menu-item {
+.header-action {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4rpx;
+}
+
+.action-icon {
+  font-size: 36rpx;
+}
+
+.action-label {
+  font-size: 20rpx;
+  color: rgba(255, 255, 255, 0.9);
+}
+
+/* 资产卡片 */
+.asset-card {
+  background: $bg-card;
+  border-radius: $radius-lg;
+  margin: -24rpx 24rpx 0;
+  padding: 32rpx;
+  position: relative;
+  z-index: 10;
+  box-shadow: 0 4rpx 16rpx rgba(0, 0, 0, 0.06);
+}
+
+.asset-row {
   display: flex;
   align-items: center;
+}
+
+.asset-item {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.asset-value {
+  font-size: 36rpx;
+  font-weight: 700;
+  color: $text-primary;
+}
+
+.asset-label {
+  font-size: 22rpx;
+  color: $text-tertiary;
+  margin-top: 4rpx;
+}
+
+.asset-divider {
+  width: 1rpx;
+  height: 64rpx;
+  background: $border;
+}
+
+.asset-btns {
+  display: flex;
+  justify-content: center;
+  margin-top: 24rpx;
+}
+
+.asset-btn {
+  padding: 12rpx 48rpx;
+  border-radius: 999rpx;
+}
+
+.asset-btn.recharge {
+  background: $primary;
+}
+
+.asset-btn-text {
+  color: #fff;
+  font-size: 26rpx;
+  font-weight: 500;
+}
+
+/* VIP卡片 */
+.vip-card {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin: 24rpx 24rpx 0;
+  background: linear-gradient(135deg, #FFF8E1 0%, #FFE082 100%);
+  border-radius: $radius-lg;
+  padding: 24rpx;
+}
+
+.vip-left {
+  display: flex;
+  align-items: center;
+}
+
+.vip-icon {
+  font-size: 40rpx;
+  margin-right: 16rpx;
+}
+
+.vip-info {
+  display: flex;
+  flex-direction: column;
+}
+
+.vip-title {
+  font-size: 30rpx;
+  font-weight: 700;
+  color: #795548;
+}
+
+.vip-desc {
+  font-size: 22rpx;
+  color: #A1887F;
+  margin-top: 4rpx;
+}
+
+.vip-arrow {
+  font-size: 26rpx;
+  color: #795548;
+  font-weight: 500;
+}
+
+/* 功能菜单 */
+.menu-section {
+  margin: 24rpx;
+}
+
+.menu-group {
+  background: $bg-card;
+  border-radius: $radius-lg;
+  padding: 0 24rpx;
+  margin-bottom: 24rpx;
+  box-shadow: 0 2rpx 8rpx rgba(0, 0, 0, 0.03);
+}
+
+.menu-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
   padding: 28rpx 0;
   border-bottom: 1rpx solid $border;
 }
 
-.menu .menu-item:last-child {
+.menu-item:last-child {
   border-bottom: none;
 }
 
-.menu .menu-icon {
-  font-size: 36rpx;
-  width: 60rpx;
+.menu-left {
+  display: flex;
+  align-items: center;
 }
 
-.menu .menu-name {
-  flex: 1;
+.menu-icon {
+  width: 64rpx;
+  height: 64rpx;
+  border-radius: 16rpx;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 32rpx;
+  margin-right: 20rpx;
+}
+
+.menu-name {
   font-size: 30rpx;
   color: $text-primary;
 }
 
-.menu .menu-arrow {
+.menu-right {
+  display: flex;
+  align-items: center;
+  gap: 8rpx;
+}
+
+.menu-badge {
+  font-size: 20rpx;
+  color: $danger;
+  background: #FFECEC;
+  padding: 2rpx 12rpx;
+  border-radius: 999rpx;
+  font-weight: 500;
+}
+
+.menu-arrow {
   color: $text-tertiary;
   font-size: 32rpx;
 }
 
-.btn-secondary {
-  background: $bg-page;
-  color: $text-primary;
-  height: 88rpx;
-  border-radius: 999rpx;
-  border: none;
-  font-size: 30rpx;
+/* 登录/退出 */
+.auth-section {
+  padding: 0 24rpx;
 }
 
-.brand {
+.btn-primary {
+  background: $primary;
+  color: #fff;
+  border-radius: 999rpx;
+  height: 88rpx;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 32rpx;
+  font-weight: 500;
+  border: none;
+}
+
+.btn-primary:active {
+  opacity: 0.85;
+}
+
+.btn-secondary {
+  background: $bg-card;
+  color: $text-secondary;
+  border-radius: 999rpx;
+  height: 88rpx;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 30rpx;
+  border: 1rpx solid $border;
+}
+
+/* 版本 */
+.version {
   text-align: center;
-  color: $text-tertiary;
+  padding: 48rpx 0;
+}
+
+.version-text {
   font-size: 24rpx;
-  margin-top: 48rpx;
+  color: $text-tertiary;
 }
 </style>
