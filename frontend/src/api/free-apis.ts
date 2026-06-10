@@ -1641,6 +1641,130 @@ export function getTianapiKey(): string {
   return '';
 }
 
+// ============= 30.5 婚姻登记核验 API（企业认证）============
+// 数据源：民政部权威数据
+// 需企业资质：营业执照 + 用户书面授权 + 合法用途（金融/婚恋/HR背调）
+// 供应商候选：
+//   - 阿里云市场 cmapi00071318（千数通科技，POST JSON，APPCODE 鉴权）
+//   - 智查背调 hunyinapi.com（双人核验，REST，需 KYC）
+//   - 羽山数据 IDV041（单人核验，需加解密对接）
+//   - 天远数据 TianyuanAPI.com（双人核验）
+// 配置：在「我的 → 设置 → API 密钥配置」填入
+//       - apikey: 供应商提供的 AppKey
+//       - provider: 供应商标识 'aliyun' | 'hunyin' | 'yushan' | 'tianyuan'
+//       - gateway: 供应商网关地址（可选，留空用默认）
+const MARRIAGE_PROVIDER_KEY = 'marriage_provider';
+const MARRIAGE_APIKEY_KEY = 'marriage_apikey';
+const MARRIAGE_GATEWAY_KEY = 'marriage_gateway';
+
+function marriageGetConfig() {
+  try {
+    return {
+      provider: (uni.getStorageSync(MARRIAGE_PROVIDER_KEY) as string) || '',
+      apiKey: (uni.getStorageSync(MARRIAGE_APIKEY_KEY) as string) || '',
+      gateway: (uni.getStorageSync(MARRIAGE_GATEWAY_KEY) as string) || '',
+    };
+  } catch (e) { return { provider: '', apiKey: '', gateway: '' }; }
+}
+
+export function setMarriageConfig(provider: string, apiKey: string, gateway = '') {
+  try {
+    uni.setStorageSync(MARRIAGE_PROVIDER_KEY, provider);
+    uni.setStorageSync(MARRIAGE_APIKEY_KEY, apiKey);
+    if (gateway) uni.setStorageSync(MARRIAGE_GATEWAY_KEY, gateway);
+  } catch (e) { /* noop */ }
+}
+
+function marriagePost<T = any>(path: string, body: Record<string, any>): Promise<T | null> {
+  return new Promise((resolve) => {
+    const cfg = marriageGetConfig();
+    if (!cfg.apiKey) { resolve(null); return; }
+    const base = cfg.gateway || 'https://market.aliyun.com';
+    const header: Record<string, string> = { 'Content-Type': 'application/json' };
+    // 阿里云市场使用 APPCODE 鉴权；其他供应商使用 Bearer
+    if (cfg.provider === 'aliyun') {
+      header['Authorization'] = 'APPCODE ' + cfg.apiKey;
+    } else {
+      header['Authorization'] = 'Bearer ' + cfg.apiKey;
+    }
+    uni.request({
+      url: base + path,
+      method: 'POST',
+      timeout: 12000,
+      header,
+      data: body,
+      success: (res) => {
+        if (res.statusCode >= 200 && res.statusCode < 300 && res.data) {
+          const r: any = res.data;
+          if (r.code === 200 || r.code === 0 || r.retcode === '000000') {
+            resolve((r.data || r.result || r.retdata || r) as T);
+          } else { resolve(null); }
+        } else { resolve(null); }
+      },
+      fail: () => resolve(null),
+    });
+  });
+}
+
+export interface MarriageStatus {
+  name: string;
+  idCard: string;
+  status: 'UNMARRIED' | 'MARRIED' | 'DIVORCED' | 'WIDOWED' | 'UNKNOWN';
+  statusLabel: string;
+  spouseName?: string;
+  spouseIdCard?: string;
+  regTime?: string;
+  source: string;
+}
+
+export async function queryMarriageSingle(name: string, idCard: string): Promise<MarriageStatus | null> {
+  const data: any = await marriagePost('/api/marriage/single', { name, idCard });
+  if (!data) return null;
+  const status = safeStr(data.status) || safeStr(data.result);
+  const statusMap: Record<string, MarriageStatus['status']> = {
+    'IA': 'MARRIED', 'IB': 'DIVORCED', 'INR': 'UNMARRIED',
+    '未婚': 'UNMARRIED', '结婚': 'MARRIED', '在婚': 'MARRIED',
+    '离婚': 'DIVORCED', '丧偶': 'WIDOWED',
+    '10': 'UNMARRIED', '20': 'MARRIED', '30': 'DIVORCED', '40': 'WIDOWED',
+  };
+  return {
+    name,
+    idCard,
+    status: statusMap[status] || 'UNKNOWN',
+    statusLabel: safeStr(data.statusLabel) || safeStr(data.label) || status,
+    spouseName: safeStr(data.spouseName) || safeStr(data.partner),
+    spouseIdCard: safeStr(data.spouseIdCard),
+    regTime: safeStr(data.regTime) || safeStr(data.regDate),
+    source: '民政部',
+  };
+}
+
+export interface MarriageDualResult {
+  p1: MarriageStatus;
+  p2: MarriageStatus;
+  relation: 'SPOUSE' | 'NOT_MATCH' | 'MATCH_FAILED' | 'UNKNOWN';
+  relationLabel: string;
+}
+
+export async function queryMarriageDouble(
+  name1: string, idCard1: string,
+  name2: string, idCard2: string,
+): Promise<MarriageDualResult | null> {
+  const data: any = await marriagePost('/api/marriage/dual', {
+    name1, idCard1, name2, idCard2,
+  });
+  if (!data) return null;
+  const p1 = await queryMarriageSingle(name1, idCard1);
+  const p2 = await queryMarriageSingle(name2, idCard2);
+  const rel = safeStr(data.relation) || safeStr(data.result);
+  return {
+    p1: p1 || { name: name1, idCard: idCard1, status: 'UNKNOWN', statusLabel: '查询失败', source: '民政部' },
+    p2: p2 || { name: name2, idCard: idCard2, status: 'UNKNOWN', statusLabel: '查询失败', source: '民政部' },
+    relation: rel === 'IA' || rel === 'MATCH' ? 'SPOUSE' : 'NOT_MATCH',
+    relationLabel: rel === 'IA' || rel === 'MATCH' ? '夫妻' : '匹配不成功',
+  };
+}
+
 // ============= 32. 婚姻配对（对应 pages/marriage/mate.vue）============
 // 天行接口：血型配对(84) / 生肖配对(83) / 星座配对(42) / 姓氏起源(94)
 
