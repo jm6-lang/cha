@@ -186,7 +186,7 @@ const allServices = [
   // 号码服务
   { name: '号码标记查询', icon: '📱', bgColor: '#E3F2FD', desc: '查询手机号码的标记信息', price: '', tag: '免费', tagBg: '#E8F8EF', tagColor: '#07C160', typeCode: 'carrier' },
   { name: '号码归属地', icon: '📍', bgColor: '#E3F2FD', desc: '查询手机号码归属地信息', price: '', tag: '免费', tagBg: '#E8F8EF', tagColor: '#07C160', typeCode: 'carrier' },
-  { name: '取消标记', icon: '✅', bgColor: '#E8F5E9', desc: '消除错误标记，恢复号码信誉', price: '2.9', tag: '热门', tagBg: '#FFF0E8', tagColor: '#FF8F1F', typeCode: 'carrier' },
+  { name: '清除标记', icon: '✅', bgColor: '#E8F5E9', desc: '消除错误标记，恢复号码信誉', price: '5-28', tag: '热门', tagBg: '#FFF0E8', tagColor: '#FF8F1F', typeCode: 'carrier' },
   { name: '号码估值', icon: '💎', bgColor: '#FFF3E0', desc: '靓号评估与价值分析', price: '2.9', tag: '', tagBg: '', tagColor: '', typeCode: 'carrier' },
   // 身份核验
   { name: '实名核验', icon: '🪪', bgColor: '#E8F5E9', desc: '验证姓名与身份证号是否匹配', price: '2.9', tag: '', tagBg: '', tagColor: '', typeCode: 'identity' },
@@ -208,8 +208,8 @@ const allServices = [
   { name: '企业工商信息', icon: '🏢', bgColor: '#E8EAF6', desc: '查询企业工商注册详细信息', price: '2.9', tag: '', tagBg: '', tagColor: '', typeCode: 'package' },
   { name: '企业关联关系', icon: '🔗', bgColor: '#E8EAF6', desc: '查询企业股东与投资关系', price: '2.9', tag: '', tagBg: '', tagColor: '', typeCode: 'package' },
   // 专业报告
-  { name: '深度背调报告', icon: '📋', bgColor: '#F1F8E9', desc: '全面个人背景调查报告', price: '9.9', tag: '专业', tagBg: '#E8F0FF', tagColor: '#1A6CFF', typeCode: 'report' },
-  { name: '企业尽调报告', icon: '📊', bgColor: '#F1F8E9', desc: '企业尽职调查深度报告', price: '9.9', tag: '专业', tagBg: '#E8F0FF', tagColor: '#1A6CFF', typeCode: 'report' },
+  { name: '深度背调报告', icon: '📋', bgColor: '#F1F8E9', desc: '全面个人背景调查报告', price: '5.9', tag: '专业', tagBg: '#E8F0FF', tagColor: '#1A6CFF', typeCode: 'report' },
+  { name: '企业尽调报告', icon: '📊', bgColor: '#F1F8E9', desc: '企业尽职调查深度报告', price: '5.9', tag: '专业', tagBg: '#E8F0FF', tagColor: '#1A6CFF', typeCode: 'report' },
 ];
 
 const displayServices = computed(() => {

@@ -89,14 +89,14 @@ const serviceData: Record<string, Array<{
     { name: '护照核验', icon: '📘', bgColor: '#E3F2FD', desc: '护照信息真伪核验', price: '¥2.9', tag: '', tagBg: '', tagColor: '', typeCode: 'identity' },
     { name: '驾照核验', icon: '🚘', bgColor: '#FFF3E0', desc: '驾驶证信息真伪核验', price: '¥2.9', tag: '', tagBg: '', tagColor: '', typeCode: 'identity' },
     { name: '学历查询', icon: '🎓', bgColor: '#F1F8E9', desc: '学历证书真伪查询', price: '¥2.9', tag: '', tagBg: '', tagColor: '', typeCode: 'identity' },
-    { name: '个人征信', icon: '👤', bgColor: '#E0F7FA', desc: '个人征信报告查询', price: '¥2.9', tag: '专业', tagBg: '#E8F0FF', tagColor: '#1A6CFF', typeCode: 'identity' },
+    { name: '个人征信', icon: '👤', bgColor: '#E0F7FA', desc: '个人征信报告查询', price: '¥5.9', tag: '专业', tagBg: '#E8F0FF', tagColor: '#1A6CFF', typeCode: 'identity' },
     { name: '社交账号检测', icon: '⭐', bgColor: '#FFF3E0', desc: '社交平台账号真实性检测', price: '¥2.9', tag: '', tagBg: '', tagColor: '', typeCode: 'identity' },
     { name: '虚假号码识别', icon: '🚫', bgColor: '#FFEBEE', desc: '识别虚假/虚拟手机号码', price: '¥2.9', tag: '', tagBg: '', tagColor: '', typeCode: 'identity' },
   ],
   carrier: [
     { name: '号码标记查询', icon: '📱', bgColor: '#E3F2FD', desc: '查询手机号码的标记信息', price: '免费', tag: '免费', tagBg: '#E8F8EF', tagColor: '#07C160', typeCode: 'carrier' },
     { name: '号码归属地', icon: '📍', bgColor: '#E3F2FD', desc: '查询手机号码归属地信息', price: '免费', tag: '免费', tagBg: '#E8F8EF', tagColor: '#07C160', typeCode: 'carrier' },
-    { name: '取消标记', icon: '✅', bgColor: '#E8F5E9', desc: '消除错误标记，恢复号码信誉', price: '¥2.9', tag: '热门', tagBg: '#FFF0E8', tagColor: '#FF8F1F', typeCode: 'carrier' },
+    { name: '清除标记', icon: '✅', bgColor: '#E8F5E9', desc: '消除错误标记，恢复号码信誉', price: '¥5-28', tag: '热门', tagBg: '#FFF0E8', tagColor: '#FF8F1F', typeCode: 'carrier' },
     { name: '号码估值', icon: '💎', bgColor: '#FFF3E0', desc: '靓号评估与价值分析', price: '¥2.9', tag: '', tagBg: '', tagColor: '', typeCode: 'carrier' },
     { name: '号码状态', icon: '🔄', bgColor: '#E3F2FD', desc: '查询手机号码在网状态', price: '¥2.9', tag: '', tagBg: '', tagColor: '', typeCode: 'carrier' },
     { name: '运营商认证', icon: '📶', bgColor: '#E3F2FD', desc: '运营商实名认证查询', price: '¥2.9', tag: '', tagBg: '', tagColor: '', typeCode: 'carrier' },
@@ -128,7 +128,7 @@ const serviceData: Record<string, Array<{
     { name: '行政处罚', icon: '⚡', bgColor: '#FFF3E0', desc: '查询行政处罚记录', price: '¥2.9', tag: '', tagBg: '', tagColor: '', typeCode: 'risk' },
     { name: '税务违法', icon: '🏴', bgColor: '#F3E5F5', desc: '查询税务违法记录', price: '¥2.9', tag: '', tagBg: '', tagColor: '', typeCode: 'risk' },
     { name: '网贷黑名单', icon: '⚖️', bgColor: '#F3E5F5', desc: '查询网贷黑名单信息', price: '¥2.9', tag: '', tagBg: '', tagColor: '', typeCode: 'risk' },
-    { name: '涉诉风险评估', icon: '🎲', bgColor: '#FFF3E0', desc: '综合评估涉诉风险等级', price: '¥2.9', tag: '专业', tagBg: '#E8F0FF', tagColor: '#1A6CFF', typeCode: 'risk' },
+    { name: '涉诉风险评估', icon: '🎲', bgColor: '#FFF3E0', desc: '综合评估涉诉风险等级', price: '¥5.9', tag: '专业', tagBg: '#E8F0FF', tagColor: '#1A6CFF', typeCode: 'risk' },
   ],
   finance: [
     { name: '个人信用报告', icon: '📊', bgColor: '#E0F7FA', desc: '全面个人信用风险评估报告', price: '¥2.9', tag: '热门', tagBg: '#FFF0E8', tagColor: '#FF8F1F', typeCode: 'finance' },
@@ -150,8 +150,8 @@ const serviceData: Record<string, Array<{
     { name: '资金异常', icon: '🔍', bgColor: '#E0F7FA', desc: '资金流水异常检测', price: '¥2.9', tag: '', tagBg: '', tagColor: '', typeCode: 'finance' },
     { name: '洗钱风险', icon: '📱', bgColor: '#E3F2FD', desc: '反洗钱风险评估', price: '¥2.9', tag: '专业', tagBg: '#E8F0FF', tagColor: '#1A6CFF', typeCode: 'finance' },
     { name: '投资风险', icon: '💰', bgColor: '#FFF3E0', desc: '投资理财风险评估', price: '¥2.9', tag: '', tagBg: '', tagColor: '', typeCode: 'finance' },
-    { name: '征信修复', icon: '✅', bgColor: '#E8F5E9', desc: '征信修复方案咨询', price: '¥2.9', tag: '专业', tagBg: '#E8F0FF', tagColor: '#1A6CFF', typeCode: 'finance' },
-    { name: '风险综合评估', icon: '🔍', bgColor: '#E0F7FA', desc: '全面风险综合评估报告', price: '¥2.9', tag: '专业', tagBg: '#E8F0FF', tagColor: '#1A6CFF', typeCode: 'finance' },
+    { name: '征信修复', icon: '✅', bgColor: '#E8F5E9', desc: '征信修复方案咨询', price: '¥5.9', tag: '专业', tagBg: '#E8F0FF', tagColor: '#1A6CFF', typeCode: 'finance' },
+    { name: '风险综合评估', icon: '🔍', bgColor: '#E0F7FA', desc: '全面风险综合评估报告', price: '¥5.9', tag: '专业', tagBg: '#E8F0FF', tagColor: '#1A6CFF', typeCode: 'finance' },
   ],
   car: [
     { name: '车辆信息查询', icon: '🚗', bgColor: '#FFF3E0', desc: '查询车辆基本信息与状态', price: '¥2.9', tag: '热门', tagBg: '#FFF0E8', tagColor: '#FF8F1F', typeCode: 'car' },
@@ -175,7 +175,7 @@ const serviceData: Record<string, Array<{
     { name: '企业工商信息', icon: '🏢', bgColor: '#E8EAF6', desc: '查询企业工商注册详细信息', price: '¥2.9', tag: '热门', tagBg: '#FFF0E8', tagColor: '#FF8F1F', typeCode: 'package' },
     { name: '企业关联关系', icon: '🔗', bgColor: '#E8EAF6', desc: '查询企业股东与投资关系', price: '¥2.9', tag: '', tagBg: '', tagColor: '', typeCode: 'package' },
     { name: '企业股东信息', icon: '👔', bgColor: '#E8EAF6', desc: '查询企业股东详细信息', price: '¥2.9', tag: '', tagBg: '', tagColor: '', typeCode: 'package' },
-    { name: '企业风险扫描', icon: '💰', bgColor: '#FFF3E0', desc: '全面扫描企业经营风险', price: '¥2.9', tag: '专业', tagBg: '#E8F0FF', tagColor: '#1A6CFF', typeCode: 'package' },
+    { name: '企业风险扫描', icon: '💰', bgColor: '#FFF3E0', desc: '全面扫描企业经营风险', price: '¥5.9', tag: '专业', tagBg: '#E8F0FF', tagColor: '#1A6CFF', typeCode: 'package' },
     { name: '企业经营异常', icon: '🏠', bgColor: '#FFEBEE', desc: '查询企业经营异常名录', price: '¥2.9', tag: '', tagBg: '', tagColor: '', typeCode: 'package' },
     { name: '企业失信查询', icon: '🏢', bgColor: '#E8EAF6', desc: '查询企业失信被执行信息', price: '¥2.9', tag: '', tagBg: '', tagColor: '', typeCode: 'package' },
     { name: '企业法人查询', icon: '👤', bgColor: '#E8F5E9', desc: '查询企业法定代表人信息', price: '¥2.9', tag: '', tagBg: '', tagColor: '', typeCode: 'package' },
@@ -183,8 +183,8 @@ const serviceData: Record<string, Array<{
     { name: '企业对外投资', icon: '🏢', bgColor: '#E8EAF6', desc: '查询企业对外投资情况', price: '¥2.9', tag: '', tagBg: '', tagColor: '', typeCode: 'package' },
   ],
   report: [
-    { name: '深度背调报告', icon: '📋', bgColor: '#F1F8E9', desc: '全面个人背景调查报告', price: '¥9.9', tag: '专业', tagBg: '#E8F0FF', tagColor: '#1A6CFF', typeCode: 'report' },
-    { name: '企业尽调报告', icon: '📊', bgColor: '#F1F8E9', desc: '企业尽职调查深度报告', price: '¥9.9', tag: '专业', tagBg: '#E8F0FF', tagColor: '#1A6CFF', typeCode: 'report' },
+    { name: '深度背调报告', icon: '📋', bgColor: '#F1F8E9', desc: '全面个人背景调查报告', price: '¥5.9', tag: '专业', tagBg: '#E8F0FF', tagColor: '#1A6CFF', typeCode: 'report' },
+    { name: '企业尽调报告', icon: '📊', bgColor: '#F1F8E9', desc: '企业尽职调查深度报告', price: '¥5.9', tag: '专业', tagBg: '#E8F0FF', tagColor: '#1A6CFF', typeCode: 'report' },
   ],
 };
 

@@ -299,14 +299,14 @@ const serviceInfoMap: Record<string, Record<string, { icon: string; bgColor: str
     '护照核验': { icon: '📘', bgColor: '#E3F2FD', desc: '护照信息真伪核验', price: '¥2.9' },
     '驾照核验': { icon: '🚘', bgColor: '#FFF3E0', desc: '驾驶证信息真伪核验', price: '¥2.9' },
     '学历查询': { icon: '🎓', bgColor: '#F1F8E9', desc: '学历证书真伪查询', price: '¥2.9' },
-    '个人征信': { icon: '👤', bgColor: '#E0F7FA', desc: '个人征信报告查询', price: '¥2.9' },
+    '个人征信': { icon: '👤', bgColor: '#E0F7FA', desc: '个人征信报告查询', price: '¥5.9' },
     '社交账号检测': { icon: '⭐', bgColor: '#FFF3E0', desc: '社交平台账号真实性检测', price: '¥2.9' },
     '虚假号码识别': { icon: '🚫', bgColor: '#FFEBEE', desc: '识别虚假/虚拟手机号码', price: '¥2.9' },
   },
   carrier: {
     '号码标记查询': { icon: '📱', bgColor: '#E3F2FD', desc: '查询手机号码的标记信息', price: '免费' },
     '号码归属地': { icon: '📍', bgColor: '#E3F2FD', desc: '查询手机号码归属地信息', price: '免费' },
-    '取消标记': { icon: '✅', bgColor: '#E8F5E9', desc: '消除错误标记，恢复号码信誉', price: '¥2.9' },
+    '清除标记': { icon: '✅', bgColor: '#E8F5E9', desc: '消除错误标记，恢复号码信誉', price: '¥5-28' },
     '号码估值': { icon: '💎', bgColor: '#FFF3E0', desc: '靓号评估与价值分析', price: '¥2.9' },
     '号码状态': { icon: '🔄', bgColor: '#E3F2FD', desc: '查询手机号码在网状态', price: '¥2.9' },
     '运营商认证': { icon: '📶', bgColor: '#E3F2FD', desc: '运营商实名认证查询', price: '¥2.9' },
@@ -373,7 +373,7 @@ const serviceInfoMap: Record<string, Record<string, { icon: string; bgColor: str
     '驾驶证扣分': { icon: '🛣️', bgColor: '#E8EAF6', desc: '查询驾驶证扣分情况', price: '¥2.9' },
     '车辆抵押': { icon: '📏', bgColor: '#FFF3E0', desc: '查询车辆抵押状态信息', price: '¥2.9' },
     '车辆保险': { icon: '📏', bgColor: '#FFF3E0', desc: '查询车辆保险信息', price: '¥2.9' },
-    '二手车检测': { icon: '🔧', bgColor: '#F1F8E9', desc: '二手车全面检测报告', price: '¥2.9' },
+    '二手车检测': { icon: '🔧', bgColor: '#F1F8E9', desc: '二手车全面检测报告', price: '¥5.9' },
     '车牌归属': { icon: '🔄', bgColor: '#E3F2FD', desc: '查询车牌归属地信息', price: '¥2.9' },
     '事故记录': { icon: '✅', bgColor: '#E8F5E9', desc: '查询车辆事故记录', price: '¥2.9' },
     '维保记录': { icon: '💥', bgColor: '#FFEBEE', desc: '查询车辆维修保养记录', price: '¥2.9' },
@@ -393,8 +393,8 @@ const serviceInfoMap: Record<string, Record<string, { icon: string; bgColor: str
     '企业对外投资': { icon: '🏢', bgColor: '#E8EAF6', desc: '查询企业对外投资情况', price: '¥2.9' },
   },
   report: {
-    '深度背调报告': { icon: '📋', bgColor: '#F1F8E9', desc: '全面个人背景调查报告', price: '¥9.9' },
-    '企业尽调报告': { icon: '📊', bgColor: '#F1F8E9', desc: '企业尽职调查深度报告', price: '¥9.9' },
+    '深度背调报告': { icon: '📋', bgColor: '#F1F8E9', desc: '全面个人背景调查报告', price: '¥5.9' },
+    '企业尽调报告': { icon: '📊', bgColor: '#F1F8E9', desc: '企业尽职调查深度报告', price: '¥5.9' },
   },
 };
 

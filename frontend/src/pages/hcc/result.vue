@@ -81,7 +81,7 @@
       <view class="action-area">
         <view class="action-btn primary" @tap="onCancelLabel">
           <text class="action-icon">&#10003;</text>
-          <text class="action-text">取消标记</text>
+          <text class="action-text">清除标记</text>
         </view>
         <view class="action-btn" @tap="onValuation">
           <text class="action-icon">&#128142;</text>
@@ -172,7 +172,7 @@ function copyNumber() {
 }
 
 function onCancelLabel() {
-  uni.showToast({ title: '取消标记 - 即将上线', icon: 'none' });
+  uni.showToast({ title: '清除标记 - 即将上线', icon: 'none' });
 }
 
 function onValuation() {
