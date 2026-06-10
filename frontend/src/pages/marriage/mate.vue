@@ -69,7 +69,7 @@
 
 <script setup lang="ts">
 import { ref, computed } from 'vue';
-import { queryBloodMatch, queryZodiacMatch, queryStarMatch, getTianapiKey } from '@/api/free-apis';
+import { queryBloodMatch, queryZodiacMatch, queryStarMatch, getTianapiLastError } from '@/api/free-apis';
 
 const statusBarHeight = ref(uni.getSystemInfoSync().statusBarHeight || 44);
 
@@ -121,7 +121,7 @@ const onMatch = async () => {
     if (!r) {
       // 兜底示例数据
       r = mockMatch(a, b);
-      if (!getTianapiKey()) error.value = '未配置天行 API Key，已展示示例数据';
+      error.value = getTianapiLastError() || '未配置天行 API Key，已展示示例数据';
     }
     result.value = r;
   } catch (e) {

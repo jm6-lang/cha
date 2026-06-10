@@ -1547,44 +1547,26 @@ export async function queryEarthquakes(): Promise<Earthquake[] | null> {
 }
 
 // ============= 31. 天行数据 tianapi.com 通用封装 =============
-// API 来源：天行数据（https://www.tianapi.com）
-// 调用方式：GET https://apis.tianapi.com/{endpoint}?key={apiKey}&...
-// 状态码：{ code: 200, msg: 'success', result: { list: [...] } } 或 { code: 250, msg: '...错误' }
-// 用户需在 https://www.tianapi.com 注册并申请 API Key 填入下方
+// 通过后端 Cloudflare Worker 代理（API Key 不入前端）
+// 后端仓库：/workspace/shucha-platform/api-proxy
+// 路由：GET /api/tianapi/{endpoint}?{params}（去除 key 参数）
+// 部署：npx wrangler deploy → shucha-api-proxy.<sub>.workers.dev
 
-const TIANAPI_BASE = 'https://apis.tianapi.com';
-// 用户填入的天行数据 API Key（https://www.tianapi.com 注册并申请）
-// 留空时会在每次请求前从本地存储读取用户填入的 Key
-const DEFAULT_TIANAPI_KEY = '4a108d26704ac1e9a3054d6082003273';
+const TIANAPI_PROXY = '/api/tianapi'; // 相对地址，由前端 host 提供 Worker
+const TIANAPI_BASE_ORIGIN = 'https://apis.tianapi.com'; // 仅用于回退判断
 
-function getEffectiveKey(): string {
-  if (DEFAULT_TIANAPI_KEY) return DEFAULT_TIANAPI_KEY;
-  try {
-    const stored = uni.getStorageSync('tianapi_key');
-    if (typeof stored === 'string' && stored) return stored;
-  } catch (e) { /* noop */ }
-  return '';
+function tianapiProxyUrl(endpoint: string, params: Record<string, string | number> = {}): string {
+  // 注意：前端不传 key，全部由后端 wrangler secret 注入
+  const query = Object.entries(params)
+    .filter(([k]) => k !== 'key')
+    .map(([k, v]) => `${encodeURIComponent(k)}=${encodeURIComponent(String(v))}`)
+    .join('&');
+  return `${TIANAPI_PROXY}/${endpoint}${query ? '?' + query : ''}`;
 }
-
-/** 上次请求的原始错误信息（用于 UI 提示，160=未申请, 280=缺参数, 404=接口不存在） */
-export function getTianapiLastError(): string {
-  return lastTianapiError;
-}
-
-let lastTianapiError = '';
 
 function tianapiGet<T = any>(endpoint: string, params: Record<string, string | number> = {}): Promise<T | null> {
   return new Promise((resolve) => {
-    const key = getEffectiveKey();
-    if (!key) {
-      lastTianapiError = '未配置 API Key';
-      resolve(null);
-      return;
-    }
-    const query = Object.entries({ key, ...params })
-      .map(([k, v]) => `${encodeURIComponent(k)}=${encodeURIComponent(String(v))}`)
-      .join('&');
-    const url = `${TIANAPI_BASE}/${endpoint}?${query}`;
+    const url = tianapiProxyUrl(endpoint, params);
     uni.request({
       url,
       method: 'GET',
@@ -1608,6 +1590,9 @@ function tianapiGet<T = any>(endpoint: string, params: Record<string, string | n
           } else if (body.code === 404) {
             lastTianapiError = '接口不存在或已下架';
             resolve(null);
+          } else if (body.code === 503) {
+            lastTianapiError = body.msg || '后端未配置 API Key';
+            resolve(null);
           } else {
             lastTianapiError = body.msg || `错误码 ${body.code}`;
             resolve(null);
@@ -1625,73 +1610,29 @@ function tianapiGet<T = any>(endpoint: string, params: Record<string, string | n
   });
 }
 
-/** 设置天行 API Key（运行时覆盖默认值） */
-export function setTianapiKey(key: string) {
-  // 通过 uni 存储，供下次启动使用
-  try { uni.setStorageSync('tianapi_key', key); } catch (e) { /* noop */ }
+/** 上次请求的原始错误信息（用于 UI 提示，160=未申请, 280=缺参数, 404=接口不存在） */
+export function getTianapiLastError(): string {
+  return lastTianapiError;
 }
 
-/** 读取用户配置的天行 API Key（如果已设置） */
-export function getTianapiKey(): string {
-  if (TIANAPI_KEY) return TIANAPI_KEY;
-  try {
-    const stored = uni.getStorageSync('tianapi_key');
-    if (typeof stored === 'string' && stored) return stored;
-  } catch (e) { /* noop */ }
-  return '';
-}
+let lastTianapiError = '';
 
-// ============= 30.5 婚姻登记核验 API（企业认证）============
+// ============= 30.5 婚姻登记核验 API（企业认证，通过后端代理）============
 // 数据源：民政部权威数据
 // 需企业资质：营业执照 + 用户书面授权 + 合法用途（金融/婚恋/HR背调）
-// 供应商候选：
-//   - 阿里云市场 cmapi00071318（千数通科技，POST JSON，APPCODE 鉴权）
-//   - 智查背调 hunyinapi.com（双人核验，REST，需 KYC）
-//   - 羽山数据 IDV041（单人核验，需加解密对接）
-//   - 天远数据 TianyuanAPI.com（双人核验）
-// 配置：在「我的 → 设置 → API 密钥配置」填入
-//       - apikey: 供应商提供的 AppKey
-//       - provider: 供应商标识 'aliyun' | 'hunyin' | 'yushan' | 'tianyuan'
-//       - gateway: 供应商网关地址（可选，留空用默认）
-const MARRIAGE_PROVIDER_KEY = 'marriage_provider';
-const MARRIAGE_APIKEY_KEY = 'marriage_apikey';
-const MARRIAGE_GATEWAY_KEY = 'marriage_gateway';
-
-function marriageGetConfig() {
-  try {
-    return {
-      provider: (uni.getStorageSync(MARRIAGE_PROVIDER_KEY) as string) || '',
-      apiKey: (uni.getStorageSync(MARRIAGE_APIKEY_KEY) as string) || '',
-      gateway: (uni.getStorageSync(MARRIAGE_GATEWAY_KEY) as string) || '',
-    };
-  } catch (e) { return { provider: '', apiKey: '', gateway: '' }; }
-}
-
-export function setMarriageConfig(provider: string, apiKey: string, gateway = '') {
-  try {
-    uni.setStorageSync(MARRIAGE_PROVIDER_KEY, provider);
-    uni.setStorageSync(MARRIAGE_APIKEY_KEY, apiKey);
-    if (gateway) uni.setStorageSync(MARRIAGE_GATEWAY_KEY, gateway);
-  } catch (e) { /* noop */ }
-}
+// 供应商候选：阿里云市场 / 智查背调 / 羽山数据 / 天远数据
+// 鉴权信息全部存储在后端 Cloudflare Worker（wrangler secret）
+// 前端只调：POST /api/marriage/single | /api/marriage/dual
 
 function marriagePost<T = any>(path: string, body: Record<string, any>): Promise<T | null> {
+  // 走后端代理：POST /api/marriage/{single|dual}
+  // API Key 在后端 wrangler secret 中，前端不持有
   return new Promise((resolve) => {
-    const cfg = marriageGetConfig();
-    if (!cfg.apiKey) { resolve(null); return; }
-    const base = cfg.gateway || 'https://market.aliyun.com';
-    const header: Record<string, string> = { 'Content-Type': 'application/json' };
-    // 阿里云市场使用 APPCODE 鉴权；其他供应商使用 Bearer
-    if (cfg.provider === 'aliyun') {
-      header['Authorization'] = 'APPCODE ' + cfg.apiKey;
-    } else {
-      header['Authorization'] = 'Bearer ' + cfg.apiKey;
-    }
     uni.request({
-      url: base + path,
+      url: '/api' + path,
       method: 'POST',
       timeout: 12000,
-      header,
+      header: { 'Content-Type': 'application/json' },
       data: body,
       success: (res) => {
         if (res.statusCode >= 200 && res.statusCode < 300 && res.data) {

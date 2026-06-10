@@ -1,0 +1,18 @@
+name = "shucha-api-proxy"
+main = "src/index.js"
+compatibility_date = "2024-11-01"
+
+# 路由（绑定到 CF Pages 的自定义域）
+# routes = [
+#   { pattern = "shucha.524900.xyz/api/*", zone_name = "524900.xyz" }
+# ]
+
+[vars]
+TIANAPI_BASE = "https://apis.tianapi.com"
+TMINI_BASE = "https://tmini.net/api"
+
+# Key 通过 wrangler secret 注入（不入仓库）：
+#   wrangler secret put TIANAPI_KEY
+#   wrangler secret put MARRIAGE_APIKEY
+#   wrangler secret put MARRIAGE_PROVIDER
+#   wrangler secret put MARRIAGE_GATEWAY
