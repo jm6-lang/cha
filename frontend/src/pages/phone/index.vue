@@ -67,6 +67,45 @@
         </view>
       </view>
     </view>
+
+    <view class="feature-entries">
+      <text class="section-title">号码安全</text>
+      <view class="feature-card" @tap="goMark">
+        <view class="feature-icon">🚨</view>
+        <view class="feature-info">
+          <text class="feature-name">号码标记查询</text>
+          <text class="feature-desc">10 大平台综合检测（腾讯/360/小米/华为/搜狗/电话邦/百度/联通/泰迪熊/移动）</text>
+          <view class="feature-tags">
+            <text class="ft-tag">防骚扰</text>
+            <text class="ft-tag">防诈骗</text>
+            <text class="ft-tag">企业风控</text>
+          </view>
+        </view>
+        <text class="feature-arrow">›</text>
+      </view>
+
+      <view class="feature-card" @tap="onPick({ num: '138', name: '归属地查询' })">
+        <view class="feature-icon">📍</view>
+        <view class="feature-info">
+          <text class="feature-name">手机归属地</text>
+          <text class="feature-desc">支持全国 300+ 城市精确查询，识别运营商与号段</text>
+          <view class="feature-tags">
+            <text class="ft-tag">精确到城市</text>
+            <text class="ft-tag">三网覆盖</text>
+          </view>
+        </view>
+        <text class="feature-arrow">›</text>
+      </view>
+
+      <view class="feature-card" @tap="goMobile">
+        <view class="feature-icon">📱</view>
+        <view class="feature-info">
+          <text class="feature-name">手机号码详情</text>
+          <text class="feature-desc">输入 11 位手机号，查询归属地/运营商/区号/邮编</text>
+        </view>
+        <text class="feature-arrow">›</text>
+      </view>
+    </view>
   </view>
 </template>
 
@@ -153,6 +192,14 @@ function onPick(s: any) {
 
 function onAreaPick(a: any) {
   uni.showToast({ title: `查询${a.name}号码`, icon: 'none' });
+}
+
+function goMark() {
+  uni.navigateTo({ url: '/pages/phone/mark' });
+}
+
+function goMobile() {
+  uni.navigateTo({ url: '/pages/phone/mobile' });
 }
 </script>
 
@@ -381,5 +428,68 @@ function onAreaPick(a: any) {
 .area-count {
   font-size: 20rpx;
   color: $text-tertiary;
+}
+
+/* 特色入口 */
+.feature-entries {
+  margin: 20rpx 24rpx 0;
+  background: $bg-card;
+  border-radius: $radius-lg;
+  padding: 24rpx;
+}
+.feature-card {
+  display: flex;
+  align-items: center;
+  padding: 24rpx 0;
+  border-bottom: 1rpx solid $border-light;
+}
+.feature-card:last-child {
+  border-bottom: none;
+}
+.feature-icon {
+  width: 88rpx;
+  height: 88rpx;
+  border-radius: 22rpx;
+  background: linear-gradient(135deg, #FF6B35 0%, #D84315 100%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 44rpx;
+  margin-right: 20rpx;
+  flex-shrink: 0;
+}
+.feature-info {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 4rpx;
+}
+.feature-name {
+  font-size: 30rpx;
+  font-weight: 700;
+  color: $text-primary;
+}
+.feature-desc {
+  font-size: 22rpx;
+  color: $text-tertiary;
+  line-height: 1.5;
+}
+.feature-tags {
+  display: flex;
+  gap: 8rpx;
+  margin-top: 6rpx;
+}
+.ft-tag {
+  font-size: 20rpx;
+  color: #FF6B35;
+  background: rgba(255, 107, 53, 0.1);
+  padding: 4rpx 12rpx;
+  border-radius: 10rpx;
+}
+.feature-arrow {
+  font-size: 40rpx;
+  color: $text-tertiary;
+  font-weight: 300;
+  margin-left: 12rpx;
 }
 </style>

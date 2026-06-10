@@ -1,7 +1,42 @@
 /**
  * 免费 API 服务层
  * 封装不需复杂认证、可直接调用的免费接口
+ *
+ * 号码标记查询来源：524900.xyz (tmini.net 在线 API 平台)
+ * 涵盖腾讯、360、小米、华为、搜狗、电话邦、百度、联通、泰迪熊、移动等 10 个平台
  */
+
+// ============= 通用：tmini.net 平台请求封装 =============
+
+const TMINI_BASE = 'https://tmini.net/api';
+
+function tminiGet<T = any>(endpoint: string, params: Record<string, string | number>): Promise<T | null> {
+  return new Promise((resolve) => {
+    const query = Object.entries(params)
+      .map(([k, v]) => `${encodeURIComponent(k)}=${encodeURIComponent(String(v))}`)
+      .join('&');
+    const url = `${TMINI_BASE}/${endpoint}?${query}`;
+    uni.request({
+      url,
+      method: 'GET',
+      timeout: 6000,
+      header: { 'Content-Type': 'application/json' },
+      success: (res) => {
+        if (res.statusCode >= 200 && res.statusCode < 300 && res.data) {
+          resolve(res.data as T);
+        } else {
+          resolve(null);
+        }
+      },
+      fail: () => resolve(null),
+    });
+  });
+}
+
+function safeStr(v: any, fallback = ''): string {
+  if (v === null || v === undefined) return fallback;
+  return String(v);
+}
 
 // ============= 1. 手机号归属地（本地号段数据 + 真实数据生成）============
 
@@ -138,13 +173,14 @@ function getZipCode(province: string): string {
   return map[province] || '100000';
 }
 
-// ============= 2. 号码标记查询（基于号段特征生成真实感数据）============
+// ============= 2. 号码标记查询（10 平台全接入：tmini.net）============
 
 export interface PhoneLabel {
   name: string;
   source: string;
   count: number;
   riskLevel: number; // 0=安全 1=低 2=中 3=高
+  extra?: Record<string, any>;
 }
 
 export interface PhoneLabelsResult {
@@ -153,9 +189,339 @@ export interface PhoneLabelsResult {
   city: string;
   carrier: string;
   labels: PhoneLabel[];
+  /** 各平台查询结果明细，按平台分类 */
+  platforms: PlatformLabelResult[];
 }
 
-// 标记类型池
+export interface PlatformLabelResult {
+  /** 平台名称 */
+  platform: string;
+  /** 是否查询成功 */
+  ok: boolean;
+  /** 主要标记名称（如有） */
+  label?: string;
+  /** 标记次数 */
+  count?: number;
+  /** 是否诈骗/营销 */
+  isScam?: boolean;
+  /** 风险等级 0-3 */
+  riskLevel: number;
+  /** 原始数据 */
+  raw: any;
+  /** 错误信息 */
+  err?: string;
+  /** 附加信息（如归属地、地址等） */
+  extra?: Record<string, any>;
+}
+
+// ---------- 平台 1: 腾讯手机管家 (txbiaoji) ----------
+export interface TencentLabelRaw {
+  code: number;
+  msg: string;
+  data: number; // 0无 1机构 2广告 4商业 5商户
+}
+
+const TENCENT_TAG_MAP: Record<number, string> = {
+  0: '无标记',
+  1: '机构电话',
+  2: '广告营销',
+  4: '商业营销',
+  5: '商户认证',
+};
+
+export async function queryTencentLabel(phone: string): Promise<PlatformLabelResult> {
+  const data = await tminiGet<TencentLabelRaw>('txbiaoji', { phone });
+  if (!data) return { platform: '腾讯手机管家', ok: false, riskLevel: 0, raw: null, err: '请求失败' };
+  const tag = TENCENT_TAG_MAP[data.data] || `标记类型${data.data}`;
+  const riskLevel = data.data === 0 ? 0 : data.data === 5 ? 0 : data.data === 1 ? 1 : 2;
+  return {
+    platform: '腾讯手机管家',
+    ok: data.code === 200,
+    label: data.code === 200 ? tag : undefined,
+    riskLevel,
+    raw: data,
+    err: data.code !== 200 ? data.msg : undefined,
+  };
+}
+
+// ---------- 平台 2: 360 手机卫士 (dianhua360) ----------
+export interface Safe360LabelRaw {
+  success: boolean;
+  phone: string;
+  name: string;
+  logo: string;
+  type: 'verified' | 'marked' | 'normal';
+  tags: { tag: string; count: number }[];
+  area_code: string;
+}
+
+export async function querySafe360Label(phone: string): Promise<PlatformLabelResult> {
+  const data = await tminiGet<Safe360LabelRaw>('dianhua360', { phone });
+  if (!data) return { platform: '360手机卫士', ok: false, riskLevel: 0, raw: null, err: '请求失败' };
+  const tagList = (data.tags || []).map((t) => t.tag).join('、');
+  let riskLevel = 0;
+  if (data.type === 'marked') riskLevel = 2;
+  else if (data.type === 'verified') riskLevel = 0;
+  else if (data.name) riskLevel = 1;
+  return {
+    platform: '360手机卫士',
+    ok: !!data.success,
+    label: data.name || tagList || (data.type === 'normal' ? '普通号码' : undefined),
+    riskLevel,
+    raw: data,
+    err: data.success ? undefined : '查询失败',
+  };
+}
+
+// ---------- 平台 3: 小米标记 (haoma) ----------
+export interface XiaomiLabelRaw {
+  code: number;
+  msg: string;
+  data: { phone: string; tag: string; tag_type: string; count: number; is_scam: boolean; logo: string };
+}
+
+export async function queryXiaomiLabel(phone: string): Promise<PlatformLabelResult> {
+  const data = await tminiGet<XiaomiLabelRaw>('haoma', { phone });
+  if (!data || data.code !== 200 || !data.data) {
+    return { platform: '小米标记', ok: false, riskLevel: 0, raw: data, err: data?.msg || '查询失败' };
+  }
+  const tag = data.data.tag || '正常';
+  const isScam = !!data.data.is_scam;
+  const riskLevel = isScam ? 3 : tag === '正常' ? 0 : tag.includes('诈骗') ? 3 : tag.includes('骚扰') || tag.includes('推销') ? 2 : 1;
+  return {
+    platform: '小米标记',
+    ok: true,
+    label: tag,
+    count: data.data.count,
+    isScam,
+    riskLevel,
+    raw: data,
+  };
+}
+
+// ---------- 平台 4: 华为标记 (huaweibiaoji) ----------
+export interface HuaweiLabelRaw {
+  msg: string;
+  errorCode: string; // 000000=有标记 010005=无标记
+  data: Array<{ name: string; classname1: string; classname2: string; type: string; custId: string; logo: string | null; address: string }>;
+}
+
+export async function queryHuaweiLabel(phone: string): Promise<PlatformLabelResult> {
+  const data = await tminiGet<HuaweiLabelRaw>('huaweibiaoji', { phone });
+  if (!data) return { platform: '华为标记', ok: false, riskLevel: 0, raw: null, err: '请求失败' };
+  const hasData = data.errorCode === '000000' && Array.isArray(data.data) && data.data.length > 0;
+  const name = hasData ? data.data[0]?.name : '无标记';
+  const riskLevel = !hasData ? 0 : name.includes('公安') || name.includes('银行') || name.includes('政务') || name.includes('消费者') ? 0 : 1;
+  return {
+    platform: '华为标记',
+    ok: hasData,
+    label: name,
+    riskLevel,
+    raw: data,
+    err: hasData ? undefined : '未查询到标记数据',
+  };
+}
+
+// ---------- 平台 5: 搜狗号码通 (qqhaoma) ----------
+export interface SogouLabelRaw {
+  phone: { title: string; usermark: string; number: string; icon: string; source_id: string; city?: string; province?: string; carrier?: string; area_code?: string };
+  code: number;
+  msg: string;
+  results: any[];
+}
+
+export async function querySogouLabel(phone: string): Promise<PlatformLabelResult> {
+  const data = await tminiGet<SogouLabelRaw>('qqhaoma', { phone });
+  if (!data) return { platform: '搜狗号码通', ok: false, riskLevel: 0, raw: null, err: '请求失败' };
+  const p = data.phone || ({} as any);
+  const hasMark = data.code === 0 && (p.title || p.usermark);
+  const riskLevel = !hasMark ? 0 : (p.title?.includes('骚扰') || p.title?.includes('诈骗') || p.title?.includes('欺诈')) ? 3 : 2;
+  return {
+    platform: '搜狗号码通',
+    ok: !!hasMark,
+    label: hasMark ? p.title || p.usermark : '无标记',
+    riskLevel,
+    raw: data,
+    err: hasMark ? undefined : '未查询到标记',
+    extra: { city: p.city, province: p.province, carrier: p.carrier, areaCode: p.area_code },
+  };
+}
+
+// ---------- 平台 6: 电话邦 (dianhua) ----------
+export interface DianhuaBangRaw {
+  status: string;
+  numitms: number;
+  itms: Array<{ name: string; logo: string; address: string; auth: number; tels: { tel_num: string; tel_des: string }[] }>;
+}
+
+export async function queryDianhuaBangLabel(phone: string): Promise<PlatformLabelResult> {
+  const data = await tminiGet<DianhuaBangRaw>('dianhua', { phone });
+  if (!data) return { platform: '电话邦', ok: false, riskLevel: 0, raw: null, err: '请求失败' };
+  const ok = data.status === '0' && Array.isArray(data.itms) && data.itms.length > 0;
+  const first = ok ? data.itms[0] : null;
+  const riskLevel = !ok ? 0 : (first?.auth === 1) ? 0 : 1;
+  return {
+    platform: '电话邦',
+    ok,
+    label: first?.name || '未收录',
+    riskLevel,
+    raw: data,
+    err: ok ? undefined : '未收录',
+    extra: { logo: first?.logo, address: first?.address, auth: first?.auth },
+  };
+}
+
+// ---------- 平台 7: 百度手机卫士 (baiduphone) ----------
+export interface BaiduLabelRaw {
+  code: number;
+  message: string;
+  data: { mode: string; msg: string };
+}
+
+const BAIDU_MODE_MAP: Record<string, string> = {
+  customer: '认证号/企业号',
+  normal: '普通个人号',
+};
+
+export async function queryBaiduLabel(phone: string): Promise<PlatformLabelResult> {
+  const data = await tminiGet<BaiduLabelRaw>('baiduphone', { phone });
+  if (!data) return { platform: '百度手机卫士', ok: false, riskLevel: 0, raw: null, err: '请求失败' };
+  const mode = data.data?.mode || 'unknown';
+  const desc = BAIDU_MODE_MAP[mode] || data.data?.msg || '未知';
+  return {
+    platform: '百度手机卫士',
+    ok: data.code === 200,
+    label: desc,
+    riskLevel: mode === 'customer' ? 0 : 1,
+    raw: data,
+    err: data.code === 200 ? undefined : data.message,
+  };
+}
+
+// ---------- 平台 8: 联通标记 (unicom_number) ----------
+export interface UnicomLabelRaw {
+  code: number;
+  msg: string;
+  data: { phone: string; tagName: string; tagCnt: number; lastTime: string; appealAuditInfoVO: { haveAuditing: boolean } } | null;
+}
+
+export async function queryUnicomLabel(phone: string): Promise<PlatformLabelResult> {
+  const data = await tminiGet<UnicomLabelRaw>('unicom_number', { phone });
+  if (!data) return { platform: '联通标记', ok: false, riskLevel: 0, raw: null, err: '请求失败' };
+  const d = data.data;
+  const ok = data.code === 0 && !!d;
+  const tag = d?.tagName || '无标记';
+  const riskLevel = !ok || tag === '无标记' ? 0 : tag.includes('诈骗') || tag.includes('欺诈') ? 3 : tag.includes('骚扰') || tag.includes('推销') ? 2 : 1;
+  return {
+    platform: '联通标记',
+    ok,
+    label: tag,
+    count: d?.tagCnt,
+    riskLevel,
+    raw: data,
+    err: ok ? undefined : data.msg,
+    extra: { lastTime: d?.lastTime, haveAuditing: d?.appealAuditInfoVO?.haveAuditing },
+  };
+}
+
+// ---------- 平台 9: 泰迪熊 (teddymobile) ----------
+export interface TeddyLabelRaw {
+  code: number; // 200=已标记 1=无标记
+  msg: string;
+  data: any;
+}
+
+export async function queryTeddyLabel(phone: string): Promise<PlatformLabelResult> {
+  const data = await tminiGet<TeddyLabelRaw>('teddymobile', { phone });
+  if (!data) return { platform: '泰迪熊', ok: false, riskLevel: 0, raw: null, err: '请求失败' };
+  const marked = data.code === 200;
+  return {
+    platform: '泰迪熊',
+    ok: marked,
+    label: marked ? '已被标记（可申诉）' : '无标记',
+    riskLevel: marked ? 2 : 0,
+    raw: data,
+    err: marked ? undefined : data.msg,
+  };
+}
+
+// ---------- 平台 10: 移动高频骚扰 (querySys) ----------
+export interface MobileHarassRaw {
+  code: number;
+  msg: string;
+  data: '0' | '1' | string; // 0=否 1=是
+}
+
+export async function queryMobileHarassLabel(phone: string): Promise<PlatformLabelResult> {
+  const data = await tminiGet<MobileHarassRaw>('querySys', { phone });
+  if (!data) return { platform: '移动高频骚扰', ok: false, riskLevel: 0, raw: null, err: '请求失败' };
+  const isHarass = data.data === '1';
+  return {
+    platform: '移动高频骚扰',
+    ok: data.code === 200,
+    label: isHarass ? '高频骚扰号码' : '非高频骚扰',
+    isScam: isHarass,
+    riskLevel: isHarass ? 3 : 0,
+    raw: data,
+    err: data.code === 200 ? undefined : data.msg,
+  };
+}
+
+// ---------- 综合查询：并发调用所有 10 个平台 ----------
+
+/**
+ * 综合查询一个手机号在 10 个标记平台的结果
+ * 自动并发调用 10 个平台 API，汇总标记信息
+ */
+export async function queryPhoneLabelsAll(phone: string): Promise<PhoneLabelsResult> {
+  const loc = queryPhoneLocation(phone);
+  const tasks = await Promise.all([
+    queryTencentLabel(phone),
+    querySafe360Label(phone),
+    queryXiaomiLabel(phone),
+    queryHuaweiLabel(phone),
+    querySogouLabel(phone),
+    queryDianhuaBangLabel(phone),
+    queryBaiduLabel(phone),
+    queryUnicomLabel(phone),
+    queryTeddyLabel(phone),
+    queryMobileHarassLabel(phone),
+  ]);
+
+  // 汇总各平台标记为统一的 labels 数组
+  const labels: PhoneLabel[] = [];
+  for (const r of tasks) {
+    if (r.ok && r.label && r.label !== '无标记' && r.label !== '普通号码' && r.label !== '非高频骚扰') {
+      labels.push({
+        name: r.label,
+        source: r.platform,
+        count: r.count || 1,
+        riskLevel: r.riskLevel,
+        extra: r.extra,
+      });
+    }
+  }
+
+  // 优先使用搜狗返回的归属地
+  const sogou = tasks.find((t) => t.platform === '搜狗号码通');
+  if (sogou?.ok && sogou.extra) {
+    if (sogou.extra.city) loc.city = sogou.extra.city as string;
+    if (sogou.extra.province) loc.province = sogou.extra.province as string;
+    if (sogou.extra.carrier) loc.carrier = sogou.extra.carrier as string;
+  }
+
+  return {
+    number: phone,
+    province: loc.province,
+    city: loc.city,
+    carrier: loc.carrier,
+    labels,
+    platforms: tasks,
+  };
+}
+
+// ---------- 旧版本号标记查询（离线 mock fallback）----------
+
 const LABEL_TYPES = [
   { name: '推销电话', riskLevel: 2, sources: ['360手机卫士', '腾讯手机管家', '百度手机卫士'] },
   { name: '骚扰电话', riskLevel: 2, sources: ['360手机卫士', '12321举报'] },
@@ -170,21 +536,23 @@ const LABEL_TYPES = [
   { name: '政务服务', riskLevel: 0, sources: ['12345政务热线'] },
 ];
 
+/**
+ * 同步版本：基于本地号段特征生成模拟标记数据
+ * 作为网络不可用时的兜底
+ */
 export function queryPhoneLabels(phone: string): PhoneLabelsResult {
   const loc = queryPhoneLocation(phone);
   const prefix3 = phone.substring(0, 3);
 
-  // 根据号段特征生成标记数量
   let labelCount = 0;
-  if (prefix3 === '400' || prefix3 === '800') labelCount = Math.floor(Math.random() * 3) + 2; // 服务号
-  else if (prefix3 === '95') labelCount = Math.floor(Math.random() * 2) + 1; // 95号段
-  else if (prefix3 === '170' || prefix3 === '171') labelCount = Math.floor(Math.random() * 2) + 1; // 虚拟号
-  else labelCount = Math.random() < 0.4 ? Math.floor(Math.random() * 2) : 0; // 普通号段40%概率有标记
+  if (prefix3 === '400' || prefix3 === '800') labelCount = Math.floor(Math.random() * 3) + 2;
+  else if (prefix3 === '95') labelCount = Math.floor(Math.random() * 2) + 1;
+  else if (prefix3 === '170' || prefix3 === '171') labelCount = Math.floor(Math.random() * 2) + 1;
+  else labelCount = Math.random() < 0.4 ? Math.floor(Math.random() * 2) : 0;
 
-  // 400/800 号段更可能有推销
   let labelPool = LABEL_TYPES;
   if (prefix3 === '400' || prefix3 === '800') {
-    labelPool = LABEL_TYPES.filter(l => l.riskLevel >= 1);
+    labelPool = LABEL_TYPES.filter((l) => l.riskLevel >= 1);
   }
 
   const labels: PhoneLabel[] = [];
@@ -198,7 +566,7 @@ export function queryPhoneLabels(phone: string): PhoneLabelsResult {
     });
   }
 
-  return { ...loc, labels };
+  return { ...loc, labels, platforms: [] };
 }
 
 // ============= 3. IP 归属地查询（ip-api.com 免费接口）============

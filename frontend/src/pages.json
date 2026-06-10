@@ -32,6 +32,7 @@
     { "path": "pages/error/empty", "style": { "navigationBarTitleText": "提示", "navigationBarBackgroundColor": "#07C160" } },
     { "path": "pages/user/privacy", "style": { "navigationBarTitleText": "账号与隐私", "navigationBarBackgroundColor": "#07C160" } },
     { "path": "pages/phone/index", "style": { "navigationBarTitleText": "号码大全", "navigationBarBackgroundColor": "#07C160" } },
+    { "path": "pages/phone/mark", "style": { "navigationBarTitleText": "号码标记查询", "navigationBarBackgroundColor": "#FF6B35" } },
     { "path": "pages/phone/segment", "style": { "navigationBarTitleText": "号段归属地", "navigationBarBackgroundColor": "#07C160" } },
     { "path": "pages/phone/carrier", "style": { "navigationBarTitleText": "运营商介绍", "navigationBarBackgroundColor": "#07C160" } },
     { "path": "pages/phone/virtual", "style": { "navigationBarTitleText": "虚拟运营商识别", "navigationBarBackgroundColor": "#07C160" } },
