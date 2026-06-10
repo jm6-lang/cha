@@ -15,5 +15,22 @@
     },
     "title": "数查 - 号码查询服务"
   },
+  "mp-weixin": {
+    "appid": "请替换为您的微信小程序 AppID",
+    "setting": {
+      "urlCheck": false,
+      "es6": true,
+      "postcss": true,
+      "minified": true
+    },
+    "usingComponents": true,
+    "permission": {
+      "scope.userLocation": {
+        "desc": "您的位置信息将用于查询 IP 归属地"
+      }
+    },
+    "requiredPrivateInfos": [],
+    "lazyCodeLoading": "requiredComponents"
+  },
   "vueVersion": "3"
 }
