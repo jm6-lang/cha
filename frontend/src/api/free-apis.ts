@@ -1553,8 +1553,9 @@ export async function queryEarthquakes(): Promise<Earthquake[] | null> {
 // 用户需在 https://www.tianapi.com 注册并申请 API Key 填入下方
 
 const TIANAPI_BASE = 'https://apis.tianapi.com';
-// 默认 Key 留空时会在每次请求前从本地存储读取用户填入的 Key
-const DEFAULT_TIANAPI_KEY = '';
+// 用户填入的天行数据 API Key（https://www.tianapi.com 注册并申请）
+// 留空时会在每次请求前从本地存储读取用户填入的 Key
+const DEFAULT_TIANAPI_KEY = '4a108d26704ac1e9a3054d6082003273';
 
 function getEffectiveKey(): string {
   if (DEFAULT_TIANAPI_KEY) return DEFAULT_TIANAPI_KEY;
@@ -1565,11 +1566,18 @@ function getEffectiveKey(): string {
   return '';
 }
 
+/** 上次请求的原始错误信息（用于 UI 提示，160=未申请, 280=缺参数, 404=接口不存在） */
+export function getTianapiLastError(): string {
+  return lastTianapiError;
+}
+
+let lastTianapiError = '';
+
 function tianapiGet<T = any>(endpoint: string, params: Record<string, string | number> = {}): Promise<T | null> {
   return new Promise((resolve) => {
     const key = getEffectiveKey();
     if (!key) {
-      // 未配置 Key 时返回 null，由调用方走 mock 兜底
+      lastTianapiError = '未配置 API Key';
       resolve(null);
       return;
     }
@@ -1586,15 +1594,33 @@ function tianapiGet<T = any>(endpoint: string, params: Record<string, string | n
         if (res.statusCode >= 200 && res.statusCode < 300 && res.data) {
           const body: any = res.data;
           if (body.code === 200) {
+            lastTianapiError = '';
             resolve((body.result || body) as T);
+          } else if (body.code === 160) {
+            lastTianapiError = '尚未在 [天行控制台] 申请此免费接口（普通会员可申请 10 个）';
+            resolve(null);
+          } else if (body.code === 150) {
+            lastTianapiError = 'API 调用次数不足，请升级会员';
+            resolve(null);
+          } else if (body.code === 280) {
+            lastTianapiError = `缺少必要参数：${body.msg}`;
+            resolve(null);
+          } else if (body.code === 404) {
+            lastTianapiError = '接口不存在或已下架';
+            resolve(null);
           } else {
+            lastTianapiError = body.msg || `错误码 ${body.code}`;
             resolve(null);
           }
         } else {
+          lastTianapiError = `HTTP ${res.statusCode}`;
           resolve(null);
         }
       },
-      fail: () => resolve(null),
+      fail: (err) => {
+        lastTianapiError = err.errMsg || '网络错误';
+        resolve(null);
+      },
     });
   });
 }
@@ -1626,15 +1652,14 @@ export interface BloodMatchResult {
 }
 
 export async function queryBloodMatch(type1: string, type2: string): Promise<BloodMatchResult | null> {
-  const data: any = await tianapiGet('blood/index', { blood1: type1, blood2: type2 });
+  // 天行血型参数：he=对方血型，me=我方血型；返回结构为 result.title / result.content
+  const data: any = await tianapiGet('blood/index', { he: type1, me: type2 });
   if (!data) return null;
-  const list = data.list || [];
-  const first = list[0] || {};
   return {
     type1,
     type2,
-    score: safeStr(first.value) || '85',
-    content: safeStr(first.content) || '性格契合度良好，相处融洽。',
+    score: safeStr(data.score) || safeStr(data.pair_score) || '85',
+    content: safeStr(data.content) || '性格契合度良好，相处融洽。',
   };
 }
 
@@ -1932,18 +1957,17 @@ export interface OilPriceTian {
 }
 
 export async function queryOilPriceTian(province: string = '广东'): Promise<OilPriceTian | null> {
-  const data: any = await tianapiGet('oilprice/index', { province });
+  // 天行油价参数：prov=省名（不带"省"字）
+  const data: any = await tianapiGet('oilprice/index', { prov: province });
   if (!data) return null;
-  const list = data.list || [];
-  const first = list[0] || data;
   return {
-    city: safeStr(first.city) || province,
-    oil89: safeStr(first.oil89),
-    oil92: safeStr(first.oil92),
-    oil95: safeStr(first.oil95),
-    oil98: safeStr(first.oil98),
-    oil0: safeStr(first.oil0),
-    updateTime: safeStr(first.updatetime) || safeStr(first.time),
+    city: safeStr(data.prov) || province,
+    oil89: safeStr(data.p89),
+    oil92: safeStr(data.p92),
+    oil95: safeStr(data.p95),
+    oil98: safeStr(data.p98),
+    oil0: safeStr(data.p0),
+    updateTime: safeStr(data.time),
   };
 }
 
