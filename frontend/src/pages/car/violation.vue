@@ -43,6 +43,33 @@
       </view>
     </view>
 
+    <view class="code-search-card">
+      <view class="cs-head">
+        <text class="cs-title">🚦 违章代码查询</text>
+        <text class="cs-desc">输入行为/代码查违章详情</text>
+      </view>
+      <view class="input-row">
+        <text class="input-label">行为/代码</text>
+        <input
+          v-model="codeKeyword"
+          class="form-input"
+          placeholder="如 闯红灯 / 1344"
+          placeholder-class="placeholder"
+          @confirm="onCodeSearch"
+        />
+        <text class="cs-btn" @tap="onCodeSearch">查询</text>
+      </view>
+      <view v-if="loadingCode" class="cs-loading">🔄 加载中...</view>
+      <view v-for="(c, i) in codeList" :key="i" class="cs-item">
+        <view class="cs-item-head">
+          <text class="cs-code">{{ c.code }}</text>
+          <text class="cs-fine">¥{{ c.fine }} / {{ c.points }}分</text>
+        </view>
+        <text class="cs-name">{{ c.name }}</text>
+        <text class="cs-law" v-if="c.law">依据：{{ c.law }}</text>
+      </view>
+    </view>
+
     <view v-if="result" class="result-card">
       <view class="result-summary">
         <view class="summary-item">
@@ -91,6 +118,7 @@
 
 <script setup lang="ts">
 import { ref, computed } from 'vue';
+import { queryViolationCode, type ViolationCode } from '@/api/free-apis';
 
 const statusBarHeight = ref(44);
 const sysInfo = uni.getSystemInfoSync();
@@ -100,6 +128,9 @@ const plate = ref('');
 const vin = ref('');
 const engine = ref('');
 const result = ref<any>(null);
+const codeKeyword = ref('');
+const codeList = ref<ViolationCode[]>([]);
+const loadingCode = ref(false);
 
 const canQuery = computed(() => plate.value && vin.value && engine.value);
 
@@ -120,6 +151,22 @@ function onQuery() {
     ],
   };
 }
+
+const onCodeSearch = async () => {
+  if (!codeKeyword.value.trim()) {
+    uni.showToast({ title: '请输入行为/代码', icon: 'none' });
+    return;
+  }
+  loadingCode.value = true;
+  try {
+    const r = await queryViolationCode(codeKeyword.value.trim());
+    codeList.value = r || [];
+  } catch (e) {
+    uni.showToast({ title: '查询失败', icon: 'none' });
+  } finally {
+    loadingCode.value = false;
+  }
+};
 </script>
 
 <style lang="scss" scoped>
@@ -372,5 +419,92 @@ function onQuery() {
   font-size: 24rpx;
   color: $warning;
   font-weight: 600;
+}
+
+/* 违章代码查询 */
+.code-search-card {
+  margin: 24rpx;
+  background: $bg-card;
+  border-radius: $radius-lg;
+  padding: 24rpx 28rpx;
+  box-shadow: 0 2rpx 8rpx rgba(0, 0, 0, 0.03);
+}
+
+.cs-head {
+  margin-bottom: 16rpx;
+}
+
+.cs-title {
+  font-size: 30rpx;
+  font-weight: 700;
+  color: $text-primary;
+  display: block;
+}
+
+.cs-desc {
+  font-size: 22rpx;
+  color: $text-tertiary;
+  display: block;
+  margin-top: 4rpx;
+}
+
+.cs-btn {
+  background: $warning;
+  color: #fff;
+  font-size: 24rpx;
+  padding: 12rpx 24rpx;
+  border-radius: 30rpx;
+  flex-shrink: 0;
+}
+
+.cs-loading {
+  text-align: center;
+  font-size: 24rpx;
+  color: $text-tertiary;
+  padding: 30rpx 0;
+}
+
+.cs-item {
+  padding: 20rpx 0;
+  border-bottom: 1rpx solid $border-light;
+}
+
+.cs-item:last-child {
+  border-bottom: none;
+}
+
+.cs-item-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 8rpx;
+}
+
+.cs-code {
+  font-size: 26rpx;
+  font-weight: 700;
+  color: $warning;
+  font-family: monospace;
+}
+
+.cs-fine {
+  font-size: 22rpx;
+  color: $danger;
+  font-weight: 600;
+}
+
+.cs-name {
+  display: block;
+  font-size: 26rpx;
+  color: $text-primary;
+  line-height: 1.5;
+  margin-bottom: 6rpx;
+}
+
+.cs-law {
+  display: block;
+  font-size: 22rpx;
+  color: $text-tertiary;
+  line-height: 1.5;
 }
 </style>

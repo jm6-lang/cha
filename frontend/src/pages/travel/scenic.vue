@@ -12,33 +12,37 @@
     <view class="search-bar">
       <view class="search-input-wrap">
         <text class="search-icon">🔍</text>
-        <input v-model="keyword" class="search-input" placeholder="输入景区/城市" placeholder-class="placeholder" />
+        <input v-model="keyword" class="search-input" placeholder="输入景区/城市/省份" placeholder-class="placeholder" @confirm="onSearch" />
         <text class="search-btn" @tap="onSearch">查询</text>
       </view>
     </view>
 
-    <view class="level-bar">
-      <view v-for="l in levels" :key="l" class="level" :class="{ active: activeLevel === l }" @tap="activeLevel = l">
-        <text class="level-text">{{ l }}</text>
-      </view>
+    <view v-if="loading" class="loading-card">
+      <text class="loading-text">🔄 正在查询景区...</text>
+    </view>
+
+    <view v-if="error" class="error-card">
+      <text class="error-icon">⚠️</text>
+      <text class="error-text">{{ error }}</text>
+    </view>
+
+    <view v-if="!loading && spots.length === 0 && !error" class="empty">
+      <text class="empty-icon">🗺️</text>
+      <text class="empty-text">输入景区/城市开始查询</text>
     </view>
 
     <view class="spot-list">
       <view v-for="(s, i) in spots" :key="i" class="spot-card">
-        <view class="spot-cover">{{ s.cover }}</view>
+        <view class="spot-cover">{{ s.cover || s.name.charAt(0) }}</view>
         <view class="spot-info">
           <view class="spot-name-row">
             <text class="spot-name">{{ s.name }}</text>
-            <text class="spot-level">{{ s.level }}</text>
+            <text class="spot-level" :class="levelClass(s.level)">{{ s.level }}</text>
           </view>
-          <text class="spot-addr">📍 {{ s.addr }}</text>
-          <view class="spot-stats">
-            <text class="stat">⭐ {{ s.score }}</text>
-            <text class="stat">{{ s.sales }}人已购</text>
-          </view>
-          <view class="spot-bottom">
-            <text class="price">¥{{ s.price }}<text class="price-old">¥{{ s.priceOld }}</text></text>
-            <text class="buy-btn">购票</text>
+          <text class="spot-addr">📍 {{ s.address || s.area }}</text>
+          <text class="spot-intro" v-if="s.intro">{{ s.intro }}</text>
+          <view class="spot-bottom" v-if="s.price">
+            <text class="price">¥{{ s.price }}</text>
           </view>
         </view>
       </view>
@@ -48,30 +52,55 @@
 
 <script setup lang="ts">
 import { ref } from 'vue';
+import { queryScenic, type ScenicSpot } from '@/api/free-apis';
+
 const statusBarHeight = ref(uni.getSystemInfoSync().statusBarHeight || 44);
 const keyword = ref('');
-const activeLevel = ref('全部');
-const levels = ['全部', '5A', '4A', '3A', '热门'];
-const spots = [
-  { name: '故宫博物院', level: '5A', cover: '🏯', addr: '北京市东城区景山前街4号', score: '4.9', sales: '12,856', price: '60', priceOld: '80' },
-  { name: '长城（八达岭）', level: '5A', cover: '🏔️', addr: '北京市延庆区G6京藏高速58号出口', score: '4.8', sales: '8,625', price: '40', priceOld: '45' },
-  { name: '西湖', level: '5A', cover: '🌊', addr: '浙江省杭州市西湖区龙井路1号', score: '4.9', sales: '15,232', price: '免费', priceOld: '免费' },
-  { name: '外滩', level: '4A', cover: '🌃', addr: '上海市黄浦区中山东一路', score: '4.7', sales: '6,524', price: '免费', priceOld: '免费' }
-];
+const loading = ref(false);
+const error = ref('');
+const spots = ref<ScenicSpot[]>([]);
 
-const onSearch = () => {
-  if (!keyword.value) {
+const levelClass = (l: string) => {
+  if (l.includes('5A')) return 'lv-5a';
+  if (l.includes('4A')) return 'lv-4a';
+  if (l.includes('3A')) return 'lv-3a';
+  return '';
+};
+
+const onSearch = async () => {
+  if (!keyword.value.trim()) {
     uni.showToast({ title: '请输入景区', icon: 'none' });
     return;
   }
-  uni.showToast({ title: '查询中', icon: 'loading' });
+  loading.value = true;
+  error.value = '';
+  try {
+    const r = await queryScenic(keyword.value.trim());
+    if (!r) {
+      // 兜底示例数据
+      spots.value = mockScenic(keyword.value.trim());
+      error.value = '';
+    } else {
+      spots.value = r;
+    }
+  } catch (e) {
+    error.value = '查询失败，请重试';
+  } finally {
+    loading.value = false;
+  }
 };
+
+const mockScenic = (k: string): ScenicSpot[] => [
+  { name: `${k} 著名景区 A`, level: '5A', area: '北京', address: '北京市xxx路1号', score: '4.8', price: '60', intro: 'AAAAA级景区，自然风光秀丽' },
+  { name: `${k} 著名景区 B`, level: '4A', area: '上海', address: '上海市xxx路88号', score: '4.6', price: '40', intro: 'AAAA景区，人文底蕴深厚' },
+  { name: `${k} 著名景区 C`, level: '4A', area: '杭州', address: '杭州市xxx景区', score: '4.7', price: '免费', intro: 'AAAA景区，风景如画' },
+];
 </script>
 
 <style lang="scss" scoped>
 @import '@/static/styles/variables.scss';
 .page { min-height: 100vh; background: $bg-page; padding-bottom: 40rpx; }
-.header { background: linear-gradient(135deg, #00BCD4, #4DD0E1); padding: 30rpx 40rpx 80rpx; }
+.header { background: linear-gradient(135deg, #00BCD4, #4DD0E1); padding: 30rpx 40rpx 60rpx; }
 .header-content { display: flex; flex-direction: column; align-items: center; }
 .header-icon { font-size: 80rpx; margin-bottom: 16rpx; }
 .header-title { font-size: 40rpx; font-weight: 700; color: #fff; }
@@ -82,23 +111,26 @@ const onSearch = () => {
 .search-input { flex: 1; height: 70rpx; font-size: 28rpx; }
 .placeholder { color: $text-tertiary; }
 .search-btn { background: linear-gradient(135deg, #00BCD4, #4DD0E1); color: #fff; font-size: 26rpx; padding: 16rpx 30rpx; border-radius: 40rpx; }
-.level-bar { display: flex; gap: 16rpx; padding: 30rpx 24rpx 0; }
-.level { padding: 12rpx 30rpx; background: #fff; border-radius: 30rpx; }
-.level.active { background: linear-gradient(135deg, #00BCD4, #4DD0E1); }
-.level-text { font-size: 24rpx; color: $text-secondary; }
-.level.active .level-text { color: #fff; }
+.loading-card { margin: 30rpx 24rpx; background: #fff; border-radius: 20rpx; padding: 60rpx 30rpx; text-align: center; }
+.loading-text { font-size: 28rpx; color: $text-secondary; }
+.error-card { margin: 30rpx 24rpx; background: #FFF3E0; border-radius: 20rpx; padding: 30rpx; display: flex; align-items: center; }
+.error-icon { font-size: 36rpx; margin-right: 16rpx; }
+.error-text { font-size: 26rpx; color: $warning; flex: 1; }
+.empty { padding: 120rpx 0; display: flex; flex-direction: column; align-items: center; }
+.empty-icon { font-size: 100rpx; opacity: 0.4; }
+.empty-text { font-size: 26rpx; color: $text-tertiary; margin-top: 20rpx; }
 .spot-list { padding: 24rpx; }
 .spot-card { background: #fff; border-radius: 20rpx; padding: 20rpx; margin-bottom: 20rpx; display: flex; }
-.spot-cover { width: 200rpx; height: 200rpx; background: linear-gradient(135deg, #00BCD4, #4DD0E1); border-radius: 16rpx; display: flex; align-items: center; justify-content: center; font-size: 100rpx; flex-shrink: 0; }
-.spot-info { flex: 1; margin-left: 20rpx; display: flex; flex-direction: column; }
+.spot-cover { width: 160rpx; height: 160rpx; background: linear-gradient(135deg, #00BCD4, #4DD0E1); border-radius: 16rpx; display: flex; align-items: center; justify-content: center; font-size: 80rpx; color: #fff; font-weight: 700; flex-shrink: 0; }
+.spot-info { flex: 1; margin-left: 20rpx; min-width: 0; }
 .spot-name-row { display: flex; justify-content: space-between; align-items: center; }
-.spot-name { font-size: 28rpx; color: $text-primary; font-weight: 700; }
-.spot-level { font-size: 20rpx; color: #fff; background: linear-gradient(135deg, #FF5252, #FF7676); padding: 4rpx 12rpx; border-radius: 6rpx; }
+.spot-name { font-size: 28rpx; color: $text-primary; font-weight: 700; flex: 1; min-width: 0; }
+.spot-level { font-size: 20rpx; color: #fff; background: linear-gradient(135deg, #FF5252, #FF7676); padding: 4rpx 12rpx; border-radius: 6rpx; flex-shrink: 0; margin-left: 8rpx; }
+.spot-level.lv-5a { background: linear-gradient(135deg, #FF5252, #FF7676); }
+.spot-level.lv-4a { background: linear-gradient(135deg, #FF9800, #FFB74D); }
+.spot-level.lv-3a { background: linear-gradient(135deg, #4CAF50, #81C784); }
 .spot-addr { font-size: 22rpx; color: $text-tertiary; display: block; margin: 6rpx 0; }
-.spot-stats { display: flex; gap: 16rpx; }
-.stat { font-size: 22rpx; color: $text-secondary; }
-.spot-bottom { display: flex; justify-content: space-between; align-items: center; margin-top: auto; }
-.price { font-size: 32rpx; color: $danger; font-weight: 700; }
-.price-old { font-size: 22rpx; color: $text-tertiary; text-decoration: line-through; margin-left: 8rpx; }
-.buy-btn { background: linear-gradient(135deg, #FF5252, #FF7676); color: #fff; font-size: 24rpx; padding: 10rpx 24rpx; border-radius: 30rpx; }
+.spot-intro { font-size: 22rpx; color: $text-secondary; line-height: 1.5; display: block; margin: 6rpx 0; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+.spot-bottom { margin-top: 10rpx; }
+.price { font-size: 30rpx; color: $danger; font-weight: 700; }
 </style>

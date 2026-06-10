@@ -1545,3 +1545,661 @@ export async function queryEarthquakes(): Promise<Earthquake[] | null> {
     updateAt: e.updateAt,
   }));
 }
+
+// ============= 31. 天行数据 tianapi.com 通用封装 =============
+// API 来源：天行数据（https://www.tianapi.com）
+// 调用方式：GET https://apis.tianapi.com/{endpoint}?key={apiKey}&...
+// 状态码：{ code: 200, msg: 'success', result: { list: [...] } } 或 { code: 250, msg: '...错误' }
+// 用户需在 https://www.tianapi.com 注册并申请 API Key 填入下方
+
+const TIANAPI_BASE = 'https://apis.tianapi.com';
+// 默认 Key 留空时会在每次请求前从本地存储读取用户填入的 Key
+const DEFAULT_TIANAPI_KEY = '';
+
+function getEffectiveKey(): string {
+  if (DEFAULT_TIANAPI_KEY) return DEFAULT_TIANAPI_KEY;
+  try {
+    const stored = uni.getStorageSync('tianapi_key');
+    if (typeof stored === 'string' && stored) return stored;
+  } catch (e) { /* noop */ }
+  return '';
+}
+
+function tianapiGet<T = any>(endpoint: string, params: Record<string, string | number> = {}): Promise<T | null> {
+  return new Promise((resolve) => {
+    const key = getEffectiveKey();
+    if (!key) {
+      // 未配置 Key 时返回 null，由调用方走 mock 兜底
+      resolve(null);
+      return;
+    }
+    const query = Object.entries({ key, ...params })
+      .map(([k, v]) => `${encodeURIComponent(k)}=${encodeURIComponent(String(v))}`)
+      .join('&');
+    const url = `${TIANAPI_BASE}/${endpoint}?${query}`;
+    uni.request({
+      url,
+      method: 'GET',
+      timeout: 8000,
+      header: { 'Content-Type': 'application/json' },
+      success: (res) => {
+        if (res.statusCode >= 200 && res.statusCode < 300 && res.data) {
+          const body: any = res.data;
+          if (body.code === 200) {
+            resolve((body.result || body) as T);
+          } else {
+            resolve(null);
+          }
+        } else {
+          resolve(null);
+        }
+      },
+      fail: () => resolve(null),
+    });
+  });
+}
+
+/** 设置天行 API Key（运行时覆盖默认值） */
+export function setTianapiKey(key: string) {
+  // 通过 uni 存储，供下次启动使用
+  try { uni.setStorageSync('tianapi_key', key); } catch (e) { /* noop */ }
+}
+
+/** 读取用户配置的天行 API Key（如果已设置） */
+export function getTianapiKey(): string {
+  if (TIANAPI_KEY) return TIANAPI_KEY;
+  try {
+    const stored = uni.getStorageSync('tianapi_key');
+    if (typeof stored === 'string' && stored) return stored;
+  } catch (e) { /* noop */ }
+  return '';
+}
+
+// ============= 32. 婚姻配对（对应 pages/marriage/mate.vue）============
+// 天行接口：血型配对(84) / 生肖配对(83) / 星座配对(42) / 姓氏起源(94)
+
+export interface BloodMatchResult {
+  type1: string;
+  type2: string;
+  score: string;
+  content: string;
+}
+
+export async function queryBloodMatch(type1: string, type2: string): Promise<BloodMatchResult | null> {
+  const data: any = await tianapiGet('blood/index', { blood1: type1, blood2: type2 });
+  if (!data) return null;
+  const list = data.list || [];
+  const first = list[0] || {};
+  return {
+    type1,
+    type2,
+    score: safeStr(first.value) || '85',
+    content: safeStr(first.content) || '性格契合度良好，相处融洽。',
+  };
+}
+
+export interface ZodiacMatchResult {
+  zodiac1: string;
+  zodiac2: string;
+  score: string;
+  content: string;
+}
+
+export async function queryZodiacMatch(zodiac1: string, zodiac2: string): Promise<ZodiacMatchResult | null> {
+  const data: any = await tianapiGet('shengxiao/index', { shengxiao1: zodiac1, shengxiao2: zodiac2 });
+  if (!data) return null;
+  const list = data.list || [];
+  const first = list[0] || {};
+  return {
+    zodiac1,
+    zodiac2,
+    score: safeStr(first.value) || '80',
+    content: safeStr(first.content) || '生肖配对相合，相处愉快。',
+  };
+}
+
+export interface StarMatchResult {
+  star1: string;
+  star2: string;
+  score: string;
+  content: string;
+}
+
+export async function queryStarMatch(star1: string, star2: string): Promise<StarMatchResult | null> {
+  const data: any = await tianapiGet('star/index', { star1, star2 });
+  if (!data) return null;
+  const list = data.list || [];
+  const first = list[0] || {};
+  return {
+    star1,
+    star2,
+    score: safeStr(first.value) || '75',
+    content: safeStr(first.content) || '星座配对指数良好。',
+  };
+}
+
+export interface SurnameResult {
+  surname: string;
+  origin: string;
+  story: string;
+  rank?: string;
+}
+
+export async function querySurnameOrigin(surname: string): Promise<SurnameResult | null> {
+  const data: any = await tianapiGet('surname/index', { xing: surname });
+  if (!data) return null;
+  const list = data.list || [];
+  const first = list[0] || {};
+  return {
+    surname,
+    origin: safeStr(first.origin) || '起源悠久',
+    story: safeStr(first.content) || '姓氏历史源远流长。',
+    rank: safeStr(first.rank),
+  };
+}
+
+// ============= 33. 旅游景区（对应 pages/travel/scenic.vue）============
+// 天行接口：旅游景区大全(93)
+
+export interface ScenicSpot {
+  name: string;
+  level: string;
+  area: string;
+  address: string;
+  score: string;
+  price: string;
+  intro: string;
+  cover?: string;
+}
+
+export async function queryScenic(keyword: string = '', page: number = 1, num: number = 20): Promise<ScenicSpot[] | null> {
+  const data: any = await tianapiGet('scenic/index', { word: keyword, page, num });
+  if (!data) return null;
+  const list = data.list || [];
+  return list.map((s: any) => ({
+    name: safeStr(s.name),
+    level: safeStr(s.level) || '4A',
+    area: safeStr(s.area) || '',
+    address: safeStr(s.address) || '',
+    score: safeStr(s.score) || '4.5',
+    price: safeStr(s.price) || '',
+    intro: safeStr(s.intro) || '',
+    cover: safeStr(s.pic),
+  }));
+}
+
+// ============= 34. 菜谱（对应 pages/life/food.vue）============
+// 天行接口：菜谱查询(23)
+
+export interface Recipe {
+  name: string;
+  ingredients: string;
+  steps: string;
+  tags: string;
+  pic?: string;
+}
+
+export async function queryRecipe(keyword: string, num: number = 10): Promise<Recipe[] | null> {
+  const data: any = await tianapiGet('caipu/index', { word: keyword, num });
+  if (!data) return null;
+  const list = data.list || [];
+  return list.map((r: any) => ({
+    name: safeStr(r.name),
+    ingredients: safeStr(r.kouwei) + ' ' + safeStr(r.renqun),
+    steps: safeStr(r.zhuliao) + ' | ' + safeStr(r.step || ''),
+    tags: safeStr(r.tips),
+    pic: safeStr(r.pic),
+  }));
+}
+
+// ============= 35. 黄历/节气（对应 pages/tool/calendar.vue）============
+// 天行接口：中国老黄历(45) / 二十四节气(86)
+
+export interface Huangli {
+  date: string;
+  lunar: string;
+  ganzhi: string;
+  yi: string;
+  ji: string;
+  chong: string;
+  sha: string;
+  jiri: string;
+  zhiri: string;
+}
+
+export async function queryHuangli(date: string): Promise<Huangli | null> {
+  const data: any = await tianapiGet('lunar/index', { date });
+  if (!data) return null;
+  return {
+    date,
+    lunar: safeStr(data.lunar) || '',
+    ganzhi: safeStr(data.ganzhi) || '',
+    yi: safeStr(data.yi) || '',
+    ji: safeStr(data.ji) || '',
+    chong: safeStr(data.chong) || '',
+    sha: safeStr(data.sha) || '',
+    jiri: safeStr(data.jiri) || '',
+    zhiri: safeStr(data.zhiri) || '',
+  };
+}
+
+export interface SolarTerm {
+  date: string;
+  name: string;
+  desc: string;
+}
+
+export async function querySolarTermList(): Promise<SolarTerm[] | null> {
+  const data: any = await tianapiGet('jieqi/index', {});
+  if (!data) return null;
+  const list = data.list || [];
+  return list.map((t: any) => ({
+    date: safeStr(t.date),
+    name: safeStr(t.name),
+    desc: safeStr(t.des) || safeStr(t.desc) || '',
+  }));
+}
+
+// ============= 36. 工商信息查询（对应 pages/company/*）============
+// 天行接口：工商信息查询(272) - 付费
+
+export interface CompanyInfoTian {
+  name: string;
+  legalPerson: string;
+  regCapital: string;
+  established: string;
+  status: string;
+  address: string;
+  scope: string;
+  creditCode: string;
+  type: string;
+  industry: string;
+  registrant: string;
+  regNo?: string;
+}
+
+export async function queryCompanyInfoTian(keyword: string): Promise<CompanyInfoTian | null> {
+  const data: any = await tianapiGet('company/index', { keyword });
+  if (!data) return null;
+  // 工商信息返回的 result 中可能含 list 或直接为对象
+  const first = (data.list && data.list[0]) || data;
+  return {
+    name: safeStr(first.name) || keyword,
+    legalPerson: safeStr(first.legal_person) || safeStr(first.legalPerson) || '',
+    regCapital: safeStr(first.reg_capital) || safeStr(first.regCapital) || '',
+    established: safeStr(first.established) || safeStr(first.estab_date) || '',
+    status: safeStr(first.status) || '存续',
+    address: safeStr(first.address) || safeStr(first.reg_address) || '',
+    scope: safeStr(first.scope) || safeStr(first.business_scope) || '',
+    creditCode: safeStr(first.credit_code) || safeStr(first.unified_code) || '',
+    type: safeStr(first.type) || safeStr(first.company_type) || '',
+    industry: safeStr(first.industry) || '',
+    registrant: safeStr(first.registrant) || '',
+    regNo: safeStr(first.reg_no),
+  };
+}
+
+// ============= 37. 股市术语（对应 pages/asset/stock.vue）============
+// 天行接口：股市术语(34) - 免费
+
+export interface StockTerm {
+  name: string;
+  desc: string;
+}
+
+export async function queryStockTerm(keyword: string): Promise<StockTerm[] | null> {
+  const data: any = await tianapiGet('gushi/index', { word: keyword, num: 20 });
+  if (!data) return null;
+  const list = data.list || [];
+  return list.map((s: any) => ({
+    name: safeStr(s.name),
+    desc: safeStr(s.content) || safeStr(s.desc) || '',
+  }));
+}
+
+// ============= 38. 违章代码（对应 pages/car/violation.vue）============
+// 天行接口：违章代码查询(258) - 付费
+
+export interface ViolationCode {
+  code: string;
+  name: string;
+  fine: string;
+  points: string;
+  law: string;
+}
+
+export async function queryViolationCode(keyword: string): Promise<ViolationCode[] | null> {
+  const data: any = await tianapiGet('weizhang/index', { word: keyword, num: 20 });
+  if (!data) return null;
+  const list = data.list || [];
+  return list.map((v: any) => ({
+    code: safeStr(v.code) || safeStr(v.wzno),
+    name: safeStr(v.name) || safeStr(v.wzname),
+    fine: safeStr(v.fine) || safeStr(v.money) || '',
+    points: safeStr(v.points) || safeStr(v.score) || '',
+    law: safeStr(v.law) || safeStr(v.flg) || '',
+  }));
+}
+
+// ============= 39. VIN 车架号（对应 pages/car/valuation.vue）============
+// 天行接口：车架号VIN查询(260) - 付费
+
+export interface VinInfo {
+  brand: string;
+  series: string;
+  model: string;
+  year: string;
+  engine: string;
+  gear: string;
+  output: string;
+}
+
+export async function queryVinInfo(vin: string): Promise<VinInfo | null> {
+  const data: any = await tianapiGet('vin/index', { vin });
+  if (!data) return null;
+  const first = (data.list && data.list[0]) || data;
+  return {
+    brand: safeStr(first.brand) || '',
+    series: safeStr(first.series) || safeStr(first.carseries) || '',
+    model: safeStr(first.model) || safeStr(first.carmodel) || '',
+    year: safeStr(first.year) || safeStr(first.yeartype) || '',
+    engine: safeStr(first.engine) || '',
+    gear: safeStr(first.gear) || '',
+    output: safeStr(first.output) || safeStr(first.displacement) || '',
+  };
+}
+
+// ============= 40. 二维码（对应 pages/tool/qrcode.vue）============
+// 天行接口：图片编码(82) - 把文字/网址转二维码图片
+
+export async function generateQRCode(text: string, size: number = 300): Promise<string | null> {
+  const data: any = await tianapiGet('imgcode/index', { text, size });
+  if (!data) return null;
+  return safeStr(data.imgurl) || safeStr(data.qrcode) || safeStr(data.base64) || '';
+}
+
+// ============= 41. 油价（替换/补充 queryOilPrice，对应 tool/ 中油价场景）============
+// 天行接口：实时油价(104) - 免费
+
+export interface OilPriceTian {
+  city: string;
+  oil89: string;
+  oil92: string;
+  oil95: string;
+  oil98: string;
+  oil0: string;
+  updateTime: string;
+}
+
+export async function queryOilPriceTian(province: string = '广东'): Promise<OilPriceTian | null> {
+  const data: any = await tianapiGet('oilprice/index', { province });
+  if (!data) return null;
+  const list = data.list || [];
+  const first = list[0] || data;
+  return {
+    city: safeStr(first.city) || province,
+    oil89: safeStr(first.oil89),
+    oil92: safeStr(first.oil92),
+    oil95: safeStr(first.oil95),
+    oil98: safeStr(first.oil98),
+    oil0: safeStr(first.oil0),
+    updateTime: safeStr(first.updatetime) || safeStr(first.time),
+  };
+}
+
+// ============= 42. 成语/诗词/歇后语（可扩展 pages/life/joke.vue）============
+// 天行接口：成语典故(30) / 歇后语(38) / 脑筋急转弯(28) / 神回复(39) / 周公解梦(24) / 雷人笑话(25)
+
+export interface ChengyuItem {
+  name: string;
+  content: string;
+}
+
+export async function queryChengyu(keyword: string): Promise<ChengyuItem | null> {
+  const data: any = await tianapiGet('chengyu/index', { word: keyword });
+  if (!data) return null;
+  const first = (data.list && data.list[0]) || data;
+  return {
+    name: safeStr(first.name) || keyword,
+    content: safeStr(first.content) || safeStr(first.desc) || '',
+  };
+}
+
+export async function queryXiehouyu(): Promise<ChengyuItem | null> {
+  const data: any = await tianapiGet('xiehou/index', {});
+  if (!data) return null;
+  const first = (data.list && data.list[0]) || data;
+  return {
+    name: safeStr(first.quest) || safeStr(first.name),
+    content: safeStr(first.result) || safeStr(first.content) || '',
+  };
+}
+
+export async function queryBrainTwist(): Promise<ChengyuItem | null> {
+  const data: any = await tianapiGet('naowan/index', {});
+  if (!data) return null;
+  const first = (data.list && data.list[0]) || data;
+  return {
+    name: safeStr(first.quest) || safeStr(first.title) || '脑筋急转弯',
+    content: safeStr(first.result) || safeStr(first.answer) || safeStr(first.content) || '',
+  };
+}
+
+export async function queryShenhuifu(): Promise<string | null> {
+  const data: any = await tianapiGet('shenhuifu/index', {});
+  if (!data) return null;
+  const first = (data.list && data.list[0]) || data;
+  return safeStr(first.content) || safeStr(first.text);
+}
+
+export async function queryDream(keyword: string): Promise<ChengyuItem | null> {
+  const data: any = await tianapiGet('dream/index', { word: keyword });
+  if (!data) return null;
+  const first = (data.list && data.list[0]) || data;
+  return {
+    name: keyword,
+    content: safeStr(first.content) || safeStr(first.des) || '',
+  };
+}
+
+export async function queryDuanziTian(): Promise<string | null> {
+  const data: any = await tianapiGet('duanzi/index', {});
+  if (!data) return null;
+  const first = (data.list && data.list[0]) || data;
+  return safeStr(first.content) || safeStr(first.text);
+}
+
+export async function queryKfcTian(): Promise<string | null> {
+  const data: any = await tianapiGet('kfcmt/index', {});
+  if (!data) return null;
+  const first = (data.list && data.list[0]) || data;
+  return safeStr(first.content) || safeStr(first.text);
+}
+
+export async function queryDuirenTian(): Promise<string | null> {
+  const data: any = await tianapiGet('duiren/index', {});
+  if (!data) return null;
+  const first = (data.list && data.list[0]) || data;
+  return safeStr(first.content) || safeStr(first.text);
+}
+
+// ============= 43. 手机归属地（补充 tmini 数据源，对应 pages/phone/*）============
+// 天行接口：手机归属地(44) - 付费
+
+export interface PhoneAttributionTian {
+  phone: string;
+  province: string;
+  city: string;
+  carrier: string;
+  areaCode: string;
+  postCode: string;
+}
+
+export async function queryPhoneAttributionTian(phone: string): Promise<PhoneAttributionTian | null> {
+  const data: any = await tianapiGet('phone/index', { phone });
+  if (!data) return null;
+  return {
+    phone,
+    province: safeStr(data.province),
+    city: safeStr(data.city),
+    carrier: safeStr(data.isp) || safeStr(data.carrier),
+    areaCode: safeStr(data.areacode),
+    postCode: safeStr(data.zip),
+  };
+}
+
+// ============= 44. IP 归属地（对应 pages/tool/ip-query.vue）============
+// 天行接口：ip地址查询(43) - 免费
+
+export interface IpInfoTian {
+  ip: string;
+  country: string;
+  province: string;
+  city: string;
+  isp: string;
+}
+
+export async function queryIpInfoTian(ip: string): Promise<IpInfoTian | null> {
+  const data: any = await tianapiGet('ipquery/index', { ip });
+  if (!data) return null;
+  return {
+    ip: safeStr(data.ip) || ip,
+    country: safeStr(data.country),
+    province: safeStr(data.province),
+    city: safeStr(data.city),
+    isp: safeStr(data.isp),
+  };
+}
+
+// ============= 45. 翻译（补充 tmini queryTranslation，对应 pages/tool/translate.vue）============
+// 天行接口：机器翻译(52) - 付费
+
+export async function queryTranslationTian(text: string, to: string = 'en'): Promise<string | null> {
+  const data: any = await tianapiGet('translate/index', { text, to });
+  if (!data) return null;
+  return safeStr(data.trans_result) || safeStr(data.result) || safeStr(data.content);
+}
+
+// ============= 46. 天气（替换 wttr.in，对应 pages/tool/weather.vue）============
+// 天行接口：天气预报(72) - 付费
+
+export interface WeatherTian {
+  city: string;
+  date: string;
+  week: string;
+  weather: string;
+  temperature: string;
+  temperatureLow: string;
+  wind: string;
+  humidity: string;
+  airQuality: string;
+  airLevel: string;
+  pm25: string;
+  tips: string;
+}
+
+export async function queryWeatherTian(city: string): Promise<WeatherTian[] | null> {
+  const data: any = await tianapiGet('weather/index', { city });
+  if (!data) return null;
+  const list = data.list || [];
+  return list.map((w: any) => ({
+    city,
+    date: safeStr(w.date),
+    week: safeStr(w.week),
+    weather: safeStr(w.weather),
+    temperature: safeStr(w.temperature),
+    temperatureLow: safeStr(w.lowest),
+    wind: safeStr(w.wind),
+    humidity: safeStr(w.humidity),
+    airQuality: safeStr(w.air_quality) || safeStr(w.air),
+    airLevel: safeStr(w.air_level) || safeStr(w.airlevel),
+    pm25: safeStr(w.pm25) || safeStr(w.pm2_5),
+    tips: safeStr(w.tips),
+  }));
+}
+
+// ============= 47. 中英词典（对应 pages/tool/）============
+// 天行接口：中英词典(48) - 付费
+
+export interface DictResult {
+  word: string;
+  phonetic: string;
+  translation: string;
+  definition: string;
+  example: string;
+}
+
+export async function queryDict(word: string): Promise<DictResult | null> {
+  const data: any = await tianapiGet('englishword/index', { word });
+  if (!data) return null;
+  return {
+    word,
+    phonetic: safeStr(data.phonetic) || '',
+    translation: safeStr(data.translation) || safeStr(data.translate) || '',
+    definition: safeStr(data.definition) || safeStr(data.explain) || '',
+    example: safeStr(data.example) || '',
+  };
+}
+
+// ============= 48. 汉字转拼音（对应 pages/tool/）============
+// 天行接口：汉字转拼音(70) - 免费
+
+export async function queryHanziPinyin(hanzi: string): Promise<{ hanzi: string; pinyin: string } | null> {
+  const data: any = await tianapiGet('hanzipinyin/index', { hanzi });
+  if (!data) return null;
+  return {
+    hanzi,
+    pinyin: safeStr(data.pinyin) || safeStr(data.result),
+  };
+}
+
+// ============= 49. 垃圾分类（可扩展生活类页面）============
+// 天行接口：垃圾分类(97) - 免费
+
+export interface GarbageType {
+  name: string;
+  type: string; // 可回收物 / 有害垃圾 / 厨余垃圾 / 干垃圾/其他垃圾
+  explain: string;
+  contain: string;
+  tip: string;
+}
+
+export async function queryGarbage(name: string): Promise<GarbageType | null> {
+  const data: any = await tianapiGet('lajifenlei/index', { word: name });
+  if (!data) return null;
+  const first = (data.list && data.list[0]) || data;
+  return {
+    name: safeStr(first.name) || name,
+    type: safeStr(first.type),
+    explain: safeStr(first.explain) || safeStr(first.aipre) || '',
+    contain: safeStr(first.contain) || '',
+    tip: safeStr(first.tip),
+  };
+}
+
+// ============= 50. 星座运势（可扩展）============
+// 天行接口：星座运势(78) - 付费
+
+export interface Horoscope {
+  star: string;
+  date: string;
+  overall: string;
+  love: string;
+  career: string;
+  wealth: string;
+  health: string;
+}
+
+export async function queryHoroscope(star: string, type: 'today' | 'tomorrow' | 'week' | 'month' = 'today'): Promise<Horoscope | null> {
+  const data: any = await tianapiGet('horoscope/index', { star, type });
+  if (!data) return null;
+  return {
+    star,
+    date: safeStr(data.date) || '',
+    overall: safeStr(data.summary) || safeStr(data.all) || '',
+    love: safeStr(data.love),
+    career: safeStr(data.career) || safeStr(data.work),
+    wealth: safeStr(data.money) || safeStr(data.wealth),
+    health: safeStr(data.health),
+  };
+}

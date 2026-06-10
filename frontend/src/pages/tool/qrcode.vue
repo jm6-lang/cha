@@ -31,8 +31,10 @@
       </view>
       <view class="gen-btn" @tap="onGen">生成二维码</view>
       <view v-if="qrShow" class="qr-display">
-        <view class="qr-box">▓▓░░▓<br/>░▓▓░░▓<br/>▓░▓▓░▓</view>
+        <image v-if="qrUrl" :src="qrUrl" mode="aspectFit" class="qr-img" @longpress="onSave" />
+        <view v-else class="qr-box">▓▓░░▓<br/>░▓▓░░▓<br/>▓░▓▓░▓</view>
         <text class="qr-tip">长按保存到相册</text>
+        <text v-if="genError" class="qr-error">⚠️ {{ genError }}</text>
       </view>
     </view>
 
@@ -52,6 +54,7 @@
 
 <script setup lang="ts">
 import { ref } from 'vue';
+import { generateQRCode } from '@/api/free-apis';
 const statusBarHeight = ref(uni.getSystemInfoSync().statusBarHeight || 44);
 const activeTab = ref('gen');
 const tabs = [
@@ -62,14 +65,31 @@ const genText = ref('https://shucha.com');
 const genType = ref('网址');
 const types = ['网址', '文本', '名片', 'WiFi', '电话', '短信', '邮箱'];
 const qrShow = ref(false);
+const qrUrl = ref('');
+const genError = ref('');
 const scanResult = ref('');
 
-const onGen = () => {
+const onGen = async () => {
   if (!genText.value) {
     uni.showToast({ title: '请输入内容', icon: 'none' });
     return;
   }
   qrShow.value = true;
+  genError.value = '';
+  qrUrl.value = '';
+  // 调用天行图片编码 API（对应 二维码生成）
+  const url = await generateQRCode(genText.value, 300);
+  if (url) {
+    qrUrl.value = url;
+  } else {
+    genError.value = '未配置天行 API Key，已用前端示例替代';
+  }
+};
+
+const onSave = () => {
+  if (qrUrl.value) {
+    uni.showToast({ title: '长按图片可保存', icon: 'none' });
+  }
 };
 
 const onScan = () => {
@@ -105,7 +125,9 @@ const onScan = () => {
 .gen-btn { margin-top: 30rpx; background: linear-gradient(135deg, #1A6CFF, #4A8FFF); color: #fff; font-size: 30rpx; font-weight: 700; text-align: center; padding: 26rpx; border-radius: 50rpx; }
 .qr-display { background: #fff; border-radius: 20rpx; padding: 40rpx; margin-top: 30rpx; display: flex; flex-direction: column; align-items: center; }
 .qr-box { width: 300rpx; height: 300rpx; background: #fff; border: 2rpx solid #000; line-height: 60rpx; text-align: center; font-size: 30rpx; font-weight: 700; color: #000; padding: 30rpx; box-sizing: border-box; }
+.qr-img { width: 360rpx; height: 360rpx; }
 .qr-tip { font-size: 22rpx; color: $text-tertiary; margin-top: 20rpx; }
+.qr-error { font-size: 22rpx; color: $warning; margin-top: 10rpx; }
 .scan-area { background: #fff; border-radius: 20rpx; padding: 100rpx 30rpx; display: flex; flex-direction: column; align-items: center; }
 .scan-icon { font-size: 100rpx; }
 .scan-text { font-size: 30rpx; color: $text-primary; font-weight: 600; margin-top: 20rpx; }

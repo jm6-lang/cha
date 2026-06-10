@@ -15,10 +15,55 @@
         <input
           v-model="keyword"
           class="search-input"
-          placeholder="搜索企业名称"
+          placeholder="搜索企业名称（来自工商信息API）"
           placeholder-class="placeholder"
+          @confirm="onSearch"
         />
         <text v-if="keyword" class="search-clear" @tap="keyword = ''">✕</text>
+        <text class="search-btn" @tap="onSearch">查询</text>
+      </view>
+    </view>
+
+    <view v-if="loading" class="loading-card">
+      <text class="loading-text">🔄 正在查询工商信息...</text>
+    </view>
+
+    <view v-if="searchResult" class="result-card">
+      <view class="r-head">
+        <text class="r-name">{{ searchResult.name }}</text>
+        <text v-if="searchResult.status" class="r-status">{{ searchResult.status }}</text>
+      </view>
+      <view class="r-row">
+        <text class="r-label">法定代表人</text>
+        <text class="r-val">{{ searchResult.legalPerson || '-' }}</text>
+      </view>
+      <view class="r-row">
+        <text class="r-label">注册资本</text>
+        <text class="r-val">{{ searchResult.regCapital || '-' }}</text>
+      </view>
+      <view class="r-row">
+        <text class="r-label">成立日期</text>
+        <text class="r-val">{{ searchResult.established || '-' }}</text>
+      </view>
+      <view class="r-row">
+        <text class="r-label">信用代码</text>
+        <text class="r-val">{{ searchResult.creditCode || '-' }}</text>
+      </view>
+      <view class="r-row">
+        <text class="r-label">企业类型</text>
+        <text class="r-val">{{ searchResult.type || '-' }}</text>
+      </view>
+      <view class="r-row">
+        <text class="r-label">所属行业</text>
+        <text class="r-val">{{ searchResult.industry || '-' }}</text>
+      </view>
+      <view class="r-row">
+        <text class="r-label">注册地址</text>
+        <text class="r-val multi">{{ searchResult.address || '-' }}</text>
+      </view>
+      <view class="r-row">
+        <text class="r-label">经营范围</text>
+        <text class="r-val multi">{{ searchResult.scope || '-' }}</text>
       </view>
     </view>
 
@@ -66,12 +111,34 @@
 
 <script setup lang="ts">
 import { ref, computed } from 'vue';
+import { queryCompanyInfoTian, type CompanyInfoTian } from '@/api/free-apis';
 
 const statusBarHeight = ref(44);
 const sysInfo = uni.getSystemInfoSync();
 statusBarHeight.value = sysInfo.statusBarHeight || 44;
 
 const keyword = ref('');
+const loading = ref(false);
+const searchResult = ref<CompanyInfoTian | null>(null);
+
+const onSearch = async () => {
+  if (!keyword.value.trim()) {
+    uni.showToast({ title: '请输入企业名称', icon: 'none' });
+    return;
+  }
+  loading.value = true;
+  try {
+    const r = await queryCompanyInfoTian(keyword.value.trim());
+    searchResult.value = r;
+    if (!r) {
+      uni.showToast({ title: '未查询到该企业', icon: 'none' });
+    }
+  } catch (e) {
+    uni.showToast({ title: '查询失败', icon: 'none' });
+  } finally {
+    loading.value = false;
+  }
+};
 
 const industries = ref([
   { name: '互联网', icon: '💻', color: '#E3F2FD', count: '85万' },
@@ -205,6 +272,91 @@ function onPickCompany(c: any) {
   align-items: center;
   justify-content: center;
   font-size: 22rpx;
+}
+
+.search-btn {
+  background: linear-gradient(180deg, #5C6BC0 0%, #3949AB 100%);
+  color: #fff;
+  font-size: 24rpx;
+  padding: 12rpx 24rpx;
+  border-radius: 30rpx;
+  margin-left: 12rpx;
+  flex-shrink: 0;
+}
+
+.loading-card {
+  margin: 30rpx 24rpx;
+  background: $bg-card;
+  border-radius: $radius-lg;
+  padding: 60rpx 30rpx;
+  text-align: center;
+}
+
+.loading-text {
+  font-size: 28rpx;
+  color: $text-secondary;
+}
+
+.result-card {
+  background: $bg-card;
+  margin: 30rpx 24rpx;
+  border-radius: $radius-lg;
+  overflow: hidden;
+}
+
+.r-head {
+  padding: 24rpx;
+  background: linear-gradient(135deg, #E8EAF6, #C5CAE9);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.r-name {
+  font-size: 30rpx;
+  font-weight: 700;
+  color: $text-primary;
+  flex: 1;
+}
+
+.r-status {
+  font-size: 22rpx;
+  color: $primary;
+  background: rgba(7, 193, 96, 0.1);
+  padding: 4rpx 12rpx;
+  border-radius: 6rpx;
+}
+
+.r-row {
+  display: flex;
+  padding: 22rpx 24rpx;
+  border-bottom: 1rpx solid $border-light;
+}
+
+.r-row:last-child {
+  border-bottom: none;
+}
+
+.r-label {
+  font-size: 26rpx;
+  color: $text-tertiary;
+  width: 160rpx;
+  flex-shrink: 0;
+}
+
+.r-val {
+  font-size: 26rpx;
+  color: $text-primary;
+  flex: 1;
+  min-width: 0;
+}
+
+.r-val.multi {
+  line-height: 1.6;
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
 }
 
 .section-title {

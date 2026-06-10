@@ -12,8 +12,20 @@
     <view class="search-bar">
       <view class="search-input-wrap">
         <text class="search-icon">🔍</text>
-        <input v-model="keyword" class="search-input" placeholder="输入股票/基金代码" placeholder-class="placeholder" />
+        <input v-model="keyword" class="search-input" placeholder="股票代码 / 基金 / 股市术语" placeholder-class="placeholder" @confirm="onSearch" />
         <text class="search-btn" @tap="onSearch">查询</text>
+      </view>
+    </view>
+
+    <view v-if="loading" class="loading-card">
+      <text class="loading-text">🔄 正在查询股市术语...</text>
+    </view>
+
+    <view v-if="termResults.length" class="term-section">
+      <text class="section-title">📖 股市术语解释</text>
+      <view v-for="(t, i) in termResults" :key="i" class="term-item">
+        <text class="term-name">{{ t.name }}</text>
+        <text class="term-desc">{{ t.desc }}</text>
       </view>
     </view>
 
@@ -95,8 +107,11 @@
 
 <script setup lang="ts">
 import { ref } from 'vue';
+import { queryStockTerm, type StockTerm } from '@/api/free-apis';
 const statusBarHeight = ref(uni.getSystemInfoSync().statusBarHeight || 44);
 const keyword = ref('');
+const loading = ref(false);
+const termResults = ref<StockTerm[]>([]);
 const searched = ref(false);
 const result = ref({
   name: '贵州茅台',
@@ -119,12 +134,21 @@ const hot = [
   { name: '比亚迪', code: '002594', price: '258.30', change: 2.15 }
 ];
 
-const onSearch = () => {
+const onSearch = async () => {
   if (!keyword.value) {
-    uni.showToast({ title: '请输入代码', icon: 'none' });
+    uni.showToast({ title: '请输入查询词', icon: 'none' });
     return;
   }
-  searched.value = true;
+  loading.value = true;
+  try {
+    const r = await queryStockTerm(keyword.value);
+    termResults.value = r || [];
+    searched.value = true;
+  } catch (e) {
+    uni.showToast({ title: '查询失败', icon: 'none' });
+  } finally {
+    loading.value = false;
+  }
 };
 </script>
 
@@ -166,6 +190,13 @@ const onSearch = () => {
 .cell-val { font-size: 28rpx; color: $text-primary; font-weight: 600; display: block; margin-top: 6rpx; }
 .hot-section { background: #fff; margin: 24rpx; border-radius: 20rpx; padding: 10rpx 24rpx; }
 .section-title { font-size: 30rpx; font-weight: 700; color: $text-primary; display: block; padding: 30rpx 24rpx 20rpx; }
+.term-section { background: #fff; margin: 24rpx; border-radius: 20rpx; padding: 20rpx 24rpx; }
+.term-item { padding: 20rpx 0; border-bottom: 1rpx solid $border-color; }
+.term-item:last-child { border-bottom: none; }
+.term-name { font-size: 28rpx; color: $danger; font-weight: 700; display: block; margin-bottom: 6rpx; }
+.term-desc { font-size: 24rpx; color: $text-secondary; line-height: 1.6; display: block; }
+.loading-card { margin: 30rpx 24rpx; background: #fff; border-radius: 20rpx; padding: 60rpx 30rpx; text-align: center; }
+.loading-text { font-size: 28rpx; color: $text-secondary; }
 .hot-item { display: flex; align-items: center; padding: 24rpx 0; border-bottom: 1rpx solid $border-color; }
 .hot-item:last-child { border-bottom: none; }
 .hot-rank { width: 50rpx; font-size: 30rpx; color: $warning; font-weight: 700; }
