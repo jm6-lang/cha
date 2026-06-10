@@ -157,7 +157,11 @@ function onThirdLogin(type: string) {
 }
 
 function onAgreement(type: string) {
-  uni.showToast({ title: type === 'user' ? '用户协议 - 即将上线' : '隐私政策 - 即将上线', icon: 'none' });
+  if (type === 'user') {
+    uni.navigateTo({ url: '/pages/agreement/user' });
+  } else {
+    uni.navigateTo({ url: '/pages/agreement/privacy' });
+  }
 }
 </script>
 

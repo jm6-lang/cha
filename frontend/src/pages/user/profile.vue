@@ -42,6 +42,19 @@
       </view>
     </view>
 
+    <!-- 头部操作区 -->
+    <view class="header-actions-float">
+      <view class="float-action" @tap="goMessage">
+        <text class="float-icon">🔔</text>
+        <view v-if="messageBadge > 0" class="float-badge">
+          <text class="float-badge-text">{{ messageBadge > 99 ? '99+' : messageBadge }}</text>
+        </view>
+      </view>
+      <view class="float-action" @tap="goSettings">
+        <text class="float-icon">⚙️</text>
+      </view>
+    </view>
+
     <!-- VIP卡片 -->
     <view class="vip-card" @tap="onVip">
       <view class="vip-left">
@@ -96,9 +109,20 @@
 </template>
 
 <script setup lang="ts">
+import { ref } from 'vue';
+import { onShow } from '@dcloudio/uni-app';
 import { useUserStore } from '@/stores/user';
 
 const user = useUserStore();
+const messageBadge = ref(3);
+
+function goMessage() {
+  uni.navigateTo({ url: '/pages/message/index' });
+}
+
+function goSettings() {
+  uni.navigateTo({ url: '/pages/user/settings' });
+}
 
 const menuGroup1 = [
   { name: '我的查询', icon: '📋', bgColor: '#E3F2FD', badge: '', action: 'history' },
@@ -167,6 +191,7 @@ function onMenu(m: any) {
   display: flex;
   align-items: center;
   justify-content: space-between;
+  position: relative;
 }
 
 .user-info {

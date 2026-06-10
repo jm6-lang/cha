@@ -21,7 +21,16 @@
     { "path": "pages/user/agent", "style": { "navigationBarTitleText": "代理中心", "navigationBarBackgroundColor": "#07C160" } },
     { "path": "pages/user/coupon", "style": { "navigationBarTitleText": "我的优惠券", "navigationBarBackgroundColor": "#07C160" } },
     { "path": "pages/community/index", "style": { "navigationBarTitleText": "社区", "navigationStyle": "custom" } },
-    { "path": "pages/user/profile", "style": { "navigationBarTitleText": "我的", "navigationStyle": "custom" } }
+    { "path": "pages/user/profile", "style": { "navigationBarTitleText": "我的", "navigationStyle": "custom" } },
+    { "path": "pages/agreement/user", "style": { "navigationBarTitleText": "用户协议", "navigationBarBackgroundColor": "#07C160" } },
+    { "path": "pages/agreement/privacy", "style": { "navigationBarTitleText": "隐私政策", "navigationBarBackgroundColor": "#07C160" } },
+    { "path": "pages/message/index", "style": { "navigationBarTitleText": "消息中心", "navigationBarBackgroundColor": "#07C160" } },
+    { "path": "pages/tool/ip-query", "style": { "navigationBarTitleText": "IP 归属地", "navigationBarBackgroundColor": "#1A6CFF" } },
+    { "path": "pages/tool/idcard-query", "style": { "navigationBarTitleText": "身份证查询", "navigationBarBackgroundColor": "#07C160" } },
+    { "path": "pages/tool/weather-query", "style": { "navigationBarTitleText": "天气查询", "navigationBarBackgroundColor": "#1976D2" } },
+    { "path": "pages/share/poster", "style": { "navigationBarTitleText": "分享", "navigationStyle": "custom" } },
+    { "path": "pages/error/empty", "style": { "navigationBarTitleText": "提示", "navigationBarBackgroundColor": "#07C160" } },
+    { "path": "pages/user/privacy", "style": { "navigationBarTitleText": "账号与隐私", "navigationBarBackgroundColor": "#07C160" } }
   ],
   "globalStyle": {
     "navigationBarTextStyle": "white",

@@ -36,7 +36,13 @@
 
 <script setup lang="ts">
 function goPage(name: string) {
-  uni.showToast({ title: `${name} - 即将上线`, icon: 'none' });
+  if (name === '用户协议') {
+    uni.navigateTo({ url: '/pages/agreement/user' });
+  } else if (name === '隐私政策') {
+    uni.navigateTo({ url: '/pages/agreement/privacy' });
+  } else if (name === '官方网站') {
+    uni.setClipboardData({ data: 'https://shucha.com', success: () => uni.showToast({ title: '网址已复制', icon: 'success' }) });
+  }
 }
 
 function callService() {

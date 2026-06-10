@@ -57,7 +57,13 @@ const notifyOn = ref(true);
 const cacheSize = ref('12.5MB');
 
 function goPage(page: string) {
-  uni.showToast({ title: `${page} - 即将上线`, icon: 'none' });
+  if (page === 'privacy') {
+    uni.navigateTo({ url: '/pages/user/privacy' });
+  } else if (page === 'security') {
+    uni.navigateTo({ url: '/pages/user/privacy' });
+  } else {
+    uni.showToast({ title: `${page} - 即将上线`, icon: 'none' });
+  }
 }
 
 function goAbout() {

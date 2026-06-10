@@ -172,15 +172,41 @@ function copyNumber() {
 }
 
 function onCancelLabel() {
-  uni.showToast({ title: '清除标记 - 即将上线', icon: 'none' });
+  uni.showToast({ title: '清除标记功能开发中', icon: 'none' });
 }
 
 function onValuation() {
-  uni.showToast({ title: '号码估值 - 即将上线', icon: 'none' });
+  uni.showToast({ title: '号码估值功能开发中', icon: 'none' });
 }
 
 function onDeepQuery() {
-  uni.showToast({ title: '深度查询 - 即将上线', icon: 'none' });
+  uni.showToast({ title: '深度查询功能开发中', icon: 'none' });
+}
+
+function onShare() {
+  uni.navigateTo({ url: `/pages/share/poster?type=phone&number=${encodeURIComponent(number.value)}` });
+}
+
+function onReport() {
+  uni.showModal({
+    title: '举报号码',
+    content: '请详细说明举报原因，平台将在 24 小时内审核处理。',
+    editable: true,
+    placeholderText: '请输入举报原因...',
+    success: (res) => {
+      if (res.confirm && res.content) {
+        uni.showToast({ title: '举报已提交', icon: 'success' });
+      }
+    },
+  });
+}
+
+function onAddContact() {
+  uni.showToast({ title: '请在系统弹窗中选择添加', icon: 'none' });
+}
+
+function onComplaint() {
+  uni.navigateTo({ url: '/pages/hcc/chat' });
 }
 </script>
 
@@ -435,6 +461,33 @@ function onDeepQuery() {
   display: flex;
   gap: 16rpx;
   margin-bottom: 24rpx;
+}
+
+/* 分享栏 */
+.share-bar {
+  display: flex;
+  background: $bg-card;
+  border-radius: $radius-lg;
+  padding: 24rpx 0;
+  margin-bottom: 24rpx;
+  box-shadow: 0 2rpx 8rpx rgba(0, 0, 0, 0.04);
+}
+
+.share-item {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8rpx;
+}
+
+.share-icon {
+  font-size: 40rpx;
+}
+
+.share-text {
+  font-size: 22rpx;
+  color: $text-secondary;
 }
 
 .action-btn {
