@@ -115,6 +115,35 @@
       </view>
     </view>
 
+    <!-- 实用工具 -->
+    <view class="tool-section">
+      <view class="section-header">
+        <text class="section-title">实用工具</text>
+      </view>
+      <view class="tool-list">
+        <view class="tool-item" @tap="goTool('ip')">
+          <view class="tool-icon" style="background: #E3F2FD">🌐</view>
+          <text class="tool-name">IP 归属地</text>
+          <text class="tool-desc">免费查询</text>
+        </view>
+        <view class="tool-item" @tap="goTool('idcard')">
+          <view class="tool-icon" style="background: #E8F5E9">🪪</view>
+          <text class="tool-name">身份证查询</text>
+          <text class="tool-desc">免费查询</text>
+        </view>
+        <view class="tool-item" @tap="goTool('weather')">
+          <view class="tool-icon" style="background: #E0F7FA">☀️</view>
+          <text class="tool-name">天气查询</text>
+          <text class="tool-desc">免费查询</text>
+        </view>
+        <view class="tool-item" @tap="onShare">
+          <view class="tool-icon" style="background: #FFF3E0">📤</view>
+          <text class="tool-name">分享好友</text>
+          <text class="tool-desc">邀请有奖</text>
+        </view>
+      </view>
+    </view>
+
     <!-- 公告栏 -->
     <view class="notice-bar">
       <text class="notice-icon">&#128227;</text>
@@ -277,6 +306,20 @@ function onServiceTap(svc: any) {
 
 function goHistory() {
   uni.navigateTo({ url: '/pages/hcc/history' });
+}
+
+function goTool(type: string) {
+  const map: Record<string, string> = {
+    ip: '/pages/tool/ip-query',
+    idcard: '/pages/tool/idcard-query',
+    weather: '/pages/tool/weather-query',
+  };
+  const url = map[type];
+  if (url) uni.navigateTo({ url });
+}
+
+function onShare() {
+  uni.navigateTo({ url: '/pages/share/poster' });
 }
 
 function reQuery(q: any) {
@@ -648,6 +691,51 @@ onShow(() => {
 .svc-arrow {
   color: $text-tertiary;
   font-size: 32rpx;
+}
+
+/* 实用工具 */
+.tool-section {
+  margin: 24rpx;
+  background: $bg-card;
+  border-radius: $radius-lg;
+  padding: 24rpx;
+  box-shadow: 0 2rpx 8rpx rgba(0, 0, 0, 0.03);
+}
+
+.tool-list {
+  display: flex;
+  margin-top: 16rpx;
+}
+
+.tool-item {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8rpx;
+  padding: 8rpx 0;
+}
+
+.tool-icon {
+  width: 88rpx;
+  height: 88rpx;
+  border-radius: 22rpx;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 44rpx;
+  margin-bottom: 4rpx;
+}
+
+.tool-name {
+  font-size: 26rpx;
+  font-weight: 500;
+  color: $text-primary;
+}
+
+.tool-desc {
+  font-size: 20rpx;
+  color: $text-tertiary;
 }
 
 /* ===== 公告栏 ===== */
