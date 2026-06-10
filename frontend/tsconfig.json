@@ -1,5 +1,4 @@
 {
-  "extends": "@dcloudio/types/dist/uni-app.d.ts",
   "compilerOptions": {
     "strict": true,
     "esModuleInterop": true,
